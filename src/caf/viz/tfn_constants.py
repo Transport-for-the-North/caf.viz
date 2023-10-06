@@ -15,8 +15,8 @@ from pathlib import Path
 
 # Third Party
 import geopandas as gpd
+import numpy as np
 import contextily as cx
-from dataclasses import dataclass
 from fiona import collection
 from caf.toolkit.config_base import BaseConfig
 from matplotlib import pyplot as plt
@@ -24,9 +24,9 @@ import matplotlib.patches as mpatches
 from matplotlib.colors import LinearSegmentedColormap
 import os
 from pydantic import validator
-
 from adjustText import adjust_text
 import pandas as pd
+import matplotlib as mpl
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
@@ -42,7 +42,7 @@ PINK = "#e50080"
 WHITE = "#ffffff"
 ORANGE = "#f15a29"
 GREY = "#5d898c"
-ICE = "66ffff"
+ICE = "#66ffff"
 YELLOW = "#e9e623"
 DARK_GREEN = "#1f3529"
 GREEN = "#a0ca2a"
@@ -59,7 +59,9 @@ NIP = (GREEN, DARK_GREEN)
 tfn_boundary = Path(
     r"Y:\Data Strategy\GIS Shapefiles\TfN Boundary\Transport_for_the_north_boundary_2020_generalised.shp"
 )
-tfn_logo_large = Path(r"C:\Users\IsaacScott\Projects\caf.viz\src\caf\TFN_logo.png")
+tfn_logo_large = Path(
+    r"C:\Users\IsaacScott\Projects\caf.viz\src\caf\TFN_logo.png"
+)
 
 
 # # # CLASSES # # #
@@ -95,6 +97,7 @@ class Layer(BaseConfig):
     marker: str = "o"
     markersize: int = 4
     clip: bool = True
+    linestyle: str = None
 
     @validator("path")
     def path_exists(cls, v):
@@ -170,10 +173,17 @@ class HeatmapLayer(Layer):
     @validator("colour_labels")
     def lengths_match(cls, v, values):
         if len(v) != len(values["colours"]):
-            raise ValueError("The lengths of 'colours' and 'colour_labels' must be the same.")
+            raise ValueError(
+                "The lengths of 'colours' and 'colour_labels' must be the same."
+            )
 
 
-def read_layer(clip: bool, crs: str, path: Path, bound: gpd.GeoDataFrame):
+def read_layer(
+    clip: bool, crs: str, path: Path, bound: gpd.GeoDataFrame
+):
+    """
+    Read in shapefile, sets the crs and clips to TfN boundary if asked for.
+    """
     layer = gpd.read_file(path)
     if layer.crs is None:
         layer.set_crs(crs, inplace=True)
@@ -181,14 +191,34 @@ def read_layer(clip: bool, crs: str, path: Path, bound: gpd.GeoDataFrame):
         layer.to_crs(crs, inplace=True)
     if clip:
         layer = layer.clip(bound)
+    layer.explore()
     return layer
 
 
 def heatmap_plot(
-    attributes: HeatmapLayer, crs: str, bound: gpd.GeoDataFrame, custom_handles: list, ax, fig
+    attributes: HeatmapLayer,
+    crs: str,
+    bound: gpd.GeoDataFrame,
+    custom_handles: list,
+    ax,
+    fig,
 ):
+    """
+    Plots heatmap from a set of parameters on an input axes, and returns
+    handles to be added to a legend.
+    """
     layer = read_layer(attributes.clip, crs, attributes.path, bound)
     cmap = LinearSegmentedColormap.from_list("", attributes.colours)
+    # heatmap, xedges, yedges = np.histogram2d(
+    #     layer.centroid.geometry.x,
+    #     layer.centroid.geometry.y,
+    #     weights=layer[attributes.column],
+    #     bins=10,
+    # )
+    # extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+    # plt.imshow(heatmap.T, extent=extent, origin="lower")
+    # plt.colorbar()
+    # plt.show()
     layer.plot(
         ax=ax,
         label=attributes.name,
@@ -216,6 +246,11 @@ def mono_plot(
     fig,
     all_texts: list[tuple[float, float, str]],
 ):
+    """
+    Plots a shapefile in a single colour according to parameters given in a
+    MonoLayer class. Returns handles to be added to a legend and texts to be
+    annotated on the plot.
+    """
     layer = read_layer(attributes.clip, crs, attributes.path, bound)
     layer.plot(
         ax=ax,
@@ -228,7 +263,9 @@ def mono_plot(
         markersize=attributes.markersize,
     )
     if "Polygon" in layer.geom_type.to_list():
-        handle = mpatches.Patch(color=attributes.colour, label=attributes.name)
+        handle = mpatches.Patch(
+            color=attributes.colour, label=attributes.name
+        )
         custom_handles.append(handle)
     if attributes.label:
         texts = [
@@ -253,8 +290,14 @@ def cat_plot(
     fig,
     all_texts: list[tuple[float, float, str]],
 ):
+    """
+    Plots a shapefile with colours categorised by a given column. Returns
+    handles to be added to a legend and texts to be added to the axis.
+    """
     layer = read_layer(attributes.clip, crs, attributes.path, bound)
-    for i, j in zip(layer[attributes.column].unique(), attributes.colours):
+    for i, j in zip(
+        layer[attributes.column].unique(), attributes.colours
+    ):
         gdf = layer[layer[attributes.column] == i]
         gdf.plot(
             ax=ax,
@@ -291,6 +334,10 @@ def plotter(
     heatmap_layers: list[HeatmapLayer] = [],
     legend_title: str = None,
 ):
+    """
+    Runs plotters for all provided layers, then adds a legend and any required
+    texts to the axis and returns the fig and axis, which can be saved.
+    """
     custom_handles = []
     all_texts = []
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -298,7 +345,9 @@ def plotter(
     bound.plot(ax=ax, color=GREY)
     # cx.add_basemap(ax, source=cx.providers.OpenStreetMap.Mapnik, crs=crs)
     for attributes in heatmap_layers:
-        custom_handles = heatmap_plot(attributes, crs, bound, custom_handles, ax, fig)
+        custom_handles = heatmap_plot(
+            attributes, crs, bound, custom_handles, ax, fig
+        )
     for attributes in cat_layers:
         custom_handles, all_texts = cat_plot(
             attributes, crs, bound, custom_handles, ax, fig, all_texts
@@ -314,10 +363,14 @@ def plotter(
     else:
         legend = ax.legend(handles=custom_handles)
     bbox = legend.get_bbox_to_anchor().transformed(fig.transFigure)
-    all_texts.append((320000, 330000, "Contains OS data © Crown copyright 2022"))
+    all_texts.append(
+        (320000, 330000, "Contains OS data © Crown copyright 2022")
+    )
     final_texts = [ax.text(i[0], i[1], i[2]) for i in all_texts]
     adjust_text(final_texts, objects=[bbox])
     ax.axis("off")
+    arr_image = mpl.image.imread(tfn_logo_large)
+    ax.imshow(arr_image, aspect="equal", zorder=1)
     print("debugging")
     return fig, ax
 
@@ -358,7 +411,9 @@ if __name__ == "__main__":
     cities = MonoLayer(
         name="_nolegend_",
         label="City",
-        path=Path(r"Y:\Data Strategy\GIS Shapefiles\STP Shapes\STP\STP\TfN Cities.shp"),
+        path=Path(
+            r"Y:\Data Strategy\GIS Shapefiles\STP Shapes\STP\STP\TfN Cities.shp"
+        ),
         zorder=10,
         markersize=0,
         colour=GREY,
@@ -462,26 +517,28 @@ if __name__ == "__main__":
     )
     warehouses = HeatmapLayer(
         name="Warehouse Density",
-        path=Path(r"Y:\Freight\13 Freight Analysis\NDR Business Floorspace\QGIS\LAD_NDR.shp"),
+        path=Path(
+            r"Y:\Freight\13 Freight Analysis\NDR Business Floorspace\QGIS\LAD_NDR.shp"
+        ),
         colours=[YELLOW, DARK_GREEN],
         column="density",
         zorder=1,
         colour_labels=["Low", "High"],
     )
-    fig, ax = plotter(cat_layers=[SDC],mono_layers=[cities], crs="EPSG:27700")
-    fig.savefig("sdc.png")
-    # fig, ax = plotter(
-    #     mono_layers=[cities, mrn, srn, ent_zones, ports, airports],
-    #     cat_layers=[eco_centres],
-    #     crs="EPSG:27700",
-    # )
-    # fig.savefig("mrn.png")
+    # fig, ax = plotter(cat_layers=[SDC], mono_layers=[cities])
+    # fig.savefig("sdc.png")
+    fig, ax = plotter(
+        mono_layers=[cities, mrn, srn, ent_zones, ports, airports],
+        cat_layers=[eco_centres],
+        crs="EPSG:27700",
+    )
+    fig.savefig("mrn.png")
     # fig, ax = plotter(mono_layers=[UNESCO, AONB, parks, paid, free, no_data, coastal], crs="EPSG:27700")
     # fig.savefig("tourism.png")
-    # fig, ax = plotter(
-    #     heatmap_layers=[warehouses],
-    #     mono_layers=[mrn, airports, ports, cities],
-    #     legend_title="Warehouse Density",
-    # )
-    # fig.savefig("freight.png")
+    fig, ax = plotter(
+        heatmap_layers=[warehouses],
+        mono_layers=[mrn, airports, ports, cities],
+        legend_title="Warehouse Density",
+    )
+    fig.savefig("freight.png")
     print("debugging")
