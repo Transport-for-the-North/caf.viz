@@ -49,6 +49,10 @@ match = '(?!_test)(?!test_)(?!__init__).*\.py'
 
 [tool.pytest.ini_options]
 addopts = "--cov=caf.viz --cov-report=xml"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: integration tests, these may require manual checks of the outputs",
+]
 
 [tool.coverage.run]
 omit = ["*/_version.py"]

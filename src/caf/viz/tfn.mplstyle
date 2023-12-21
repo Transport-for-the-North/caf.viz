@@ -1,0 +1,24 @@
+# Matplotlib Style For TfN's Common Analytical Framework
+
+font.family: monospace
+
+figure.constrained_layout.use: true
+
+axes.grid: True
+axes.facecolor: eeeeee
+axes.edgecolor: b2b2b2
+axes.titlesize: large
+axes.labelsize: medium
+# TfN colors: navy, teal, purple, pink, orange, ice, yellow, dark_green, green
+axes.prop_cycle: cycler("color", ["0d0f0d", "00dec6", "7317de", "e50080", "f15a29", "66ffff", "e9e623", "1f3529", "a0ca2a"])
+
+grid.color: b2b2b2
+grid.linestyle: --
+grid.linewidth: 0.5
+
+legend.fancybox: True
+
+patch.facecolor: white
+patch.linewidth: 0.1
+
+
