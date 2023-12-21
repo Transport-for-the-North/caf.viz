@@ -3,6 +3,7 @@
 font.family: monospace
 
 figure.constrained_layout.use: true
+figure.titlesize: x-large
 
 axes.grid: True
 axes.facecolor: eeeeee
@@ -19,6 +20,8 @@ grid.linewidth: 0.5
 legend.fancybox: True
 
 patch.facecolor: white
-patch.linewidth: 0.1
+patch.linewidth: 0.5
 
+lines.markersize: 3
 
+image.cmap: viridis

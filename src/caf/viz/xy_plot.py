@@ -45,14 +45,20 @@ class XYPlotType(enum.Enum):
 
 
 def hexbin(
-    fig: figure.Figure, ax: axes.Axes, data: pd.DataFrame, x: str, y: str, z: str | None = None
+    fig: figure.Figure,
+    ax: axes.Axes,
+    data: pd.DataFrame,
+    x: str,
+    y: str,
+    z: str | None = None,
+    gridsize: int = 50,
 ) -> None:
     # TODO(MB) docstring
     weights = None
     if z is not None:
         weights = data[z]
 
-    hb = ax.hexbin(data[x], data[y], C=weights, mincnt=1, gridsize=50, linewidths=0.1)
+    hb = ax.hexbin(data[x], data[y], C=weights, mincnt=1, gridsize=gridsize, linewidths=0.1)
     fig.colorbar(
         hb,
         ax=ax,
@@ -96,9 +102,7 @@ def scatter(
         z_data = z_data[idx]
         xy_data = np.take(xy_data, idx, axis=1)
 
-    points = ax.scatter(
-        xy_data[0], xy_data[1], s=3, c=z_data, cmap=None if z_data is None else "viridis"
-    )
+    points = ax.scatter(xy_data[0], xy_data[1], c=z_data)
     if z is not None:
         fig.colorbar(points, ax=ax, label=z)
     elif z_data is not None:
