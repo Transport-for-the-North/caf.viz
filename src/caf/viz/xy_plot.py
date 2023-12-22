@@ -8,11 +8,14 @@ from __future__ import annotations
 import enum
 import logging
 from typing import Sequence
+import warnings
 
 import numpy as np
 import pandas as pd
+import matplotlib as mpl
 from matplotlib import axes, figure, ticker
 from scipy import stats
+from pydantic import dataclasses
 
 from caf.viz import subplots, utils
 
@@ -22,6 +25,37 @@ LOG = logging.getLogger(__name__)
 
 
 ##### FUNCTIONS & CLASSES #####
+
+
+@dataclasses.dataclass
+class BasicData:
+    """Basic data for XY plots."""
+
+    data: pd.DataFrame
+    x_column: str
+    y_column: str
+    x_label: str | None = None
+    y_label: str | None = None
+    title: str | None = None
+    auto_label: bool = True
+
+
+@dataclasses.dataclass
+class CmapData:
+    """Colormap parameters."""
+
+    column: str
+    label: str | None = None
+    auto_label: bool = True
+    cmap: str = mpl.rcParams.get("image.cmap")
+
+    def get_label(self) -> str | None:
+        """Return label for colorbar."""
+        if self.label is not None:
+            return self.label
+        if self.auto_label:
+            return self.column
+        return None
 
 
 class XYPlotType(enum.Enum):
@@ -47,50 +81,60 @@ class XYPlotType(enum.Enum):
 def hexbin(
     fig: figure.Figure,
     ax: axes.Axes,
-    data: pd.DataFrame,
-    x: str,
-    y: str,
-    z: str | None = None,
+    data: BasicData,
+    cmap: CmapData | None = None,
     gridsize: int = 50,
+    colorbar: bool = True,
 ) -> None:
     # TODO(MB) docstring
     weights = None
-    if z is not None:
-        weights = data[z]
+    if cmap is not None:
+        if cmap.column not in data.data.columns:
+            raise KeyError(f"colormap data column ('{cmap.column}') not present")
+        weights = cmap.column
 
-    hb = ax.hexbin(data[x], data[y], C=weights, mincnt=1, gridsize=gridsize, linewidths=0.1)
-    fig.colorbar(
-        hb,
-        ax=ax,
-        label="Count" if z is None else z,
-        ticks=ticker.MaxNLocator(integer=True) if z is None else None,
+    hb = ax.hexbin(
+        data.x_column,
+        data.y_column,
+        C=weights,
+        data=data.data,
+        mincnt=1,
+        gridsize=gridsize,
+        linewidths=0.1,
     )
 
-    ax.set_xlabel(x)
-    ax.set_ylabel(y)
+    if not colorbar:
+        return
+
+    if cmap is None:
+        label = "Count"
+    else:
+        label = cmap.get_label()
+
+    fig.colorbar(hb, ax=ax, label=label)
 
 
 def scatter(
     fig: figure.Figure,
     ax: axes.Axes,
-    data: pd.DataFrame,
-    x: str,
-    y: str,
+    data: BasicData,
     density: bool = False,
-    z: str | None = None,
+    cmap: CmapData | None = None,
+    colorbar: bool = True,
+    # TODO(MB) Add keyword arguments to pass to `ax.scatter`
 ) -> None:
     # TODO(MB) docstring
-    xy_data = data[[x, y]].values.T
+    xy_data = data.data[[data.x_column, data.y_column]].values.T
     z_data = None
 
-    if z is not None and density:
+    if cmap is not None and density:
         raise ValueError(
-            "z value and density shouldn't both be given,"
+            "cmap and density shouldn't both be given,"
             " unsure which to use for colouring scatter plot"
         )
 
-    if z is not None:
-        z_data = data[z]
+    if cmap is not None:
+        z_data = data.data[cmap.column]
     elif density:
         # Calculate point density
         kernel = stats.gaussian_kde(xy_data)
@@ -103,33 +147,61 @@ def scatter(
         xy_data = np.take(xy_data, idx, axis=1)
 
     points = ax.scatter(xy_data[0], xy_data[1], c=z_data)
-    if z is not None:
-        fig.colorbar(points, ax=ax, label=z)
-    elif z_data is not None:
-        fig.colorbar(points, ax=ax, label="Density", ticks=ticker.NullLocator())
 
-    ax.set_xlabel(x)
-    ax.set_ylabel(y)
+    if not colorbar or z_data is None:
+        return None
+
+    if cmap is not None:
+        fig.colorbar(points, ax=ax, label=cmap.get_label())
+    else:
+        fig.colorbar(points, ax=ax, label="Density", ticks=ticker.NullLocator())
 
 
 def axes_plot_xy(
     fig: figure.Figure,
     ax: axes.Axes,
     type_: XYPlotType,
-    data: pd.DataFrame,
-    x: str,
-    y: str,
-    z: str | None = None,
+    data: BasicData,
+    cmap: CmapData | None = None,
+    **plot_kwargs,
 ) -> None:
     # TODO(MB) docstring
     # TODO(MB) Validate columns are present in data
 
     if type_ == XYPlotType.HEXBIN:
-        hexbin(fig, ax, data, x, y, z)
+        hexbin(fig, ax, data, cmap, **plot_kwargs)
+
     elif type_ in (XYPlotType.SCATTER, XYPlotType.SCATTER_DENSITY):
-        scatter(fig, ax, data, x, y, density=type_ == XYPlotType.SCATTER_DENSITY, z=z)
+        if len(data) > 1_000_000:
+            warnings.warn(
+                "scatter plots may take a long time with "
+                "a lot of data, try hexbin plots instead",
+                RuntimeWarning,
+            )
+        scatter(
+            fig,
+            ax,
+            data,
+            density=type_ == XYPlotType.SCATTER_DENSITY,
+            cmap=cmap,
+            **plot_kwargs,
+        )
+
     else:
         raise NotImplementedError(f"unknown plot type {type_}")
+
+    if data.title is not None:
+        ax.set_title(data.title)
+
+    if data.x_label is not None:
+        ax.set_xlabel(data.x_label)
+    elif data.auto_label:
+        ax.set_xlabel(data.x_column)
+
+    if data.y_label is not None:
+        ax.set_ylabel(data.y_label)
+    elif data.auto_label:
+        ax.set_ylabel(data.y_column)
 
 
 def plot_xy(
@@ -141,6 +213,9 @@ def plot_xy(
     weight_column: None | str | Sequence[str] = None,
 ) -> figure.Figure:
     # TODO(MB) Docstring
+    # TODO(MB) Add functionality to share a colorbar
+    # TODO(MB) Add option to define subplot parameters and
+    # switch to subplotter if nrows and ncols are given
     type_ = XYPlotType(type_)
 
     if isinstance(x_column, str) and isinstance(y_column, str):
