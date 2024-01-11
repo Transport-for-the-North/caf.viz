@@ -27,7 +27,7 @@ LOG = logging.getLogger(__name__)
 ##### FUNCTIONS & CLASSES #####
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(config={"arbitrary_types_allowed": True})
 class BasicData:
     """Basic data for XY plots."""
 
@@ -243,10 +243,8 @@ def plot_xy(
         plot_data.append(
             dict(
                 type_=type_,
-                data=data,
-                x=x,
-                y=y,
-                z=None if weight_column is None else weight_column[i],
+                data=BasicData(data, x, y),
+                cmap=None if weight_column is None else CmapData(weight_column[i]),
             )
         )
 
