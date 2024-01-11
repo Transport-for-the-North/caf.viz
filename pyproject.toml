@@ -48,7 +48,7 @@ Source = "https://github.com/Transport-for-the-North/caf.viz"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"caf.toolkit" = ["py.typed"]
+"caf.viz" = ["py.typed"]
 
 # Linters
 [tool.black]
@@ -89,7 +89,7 @@ max-attributes = 15
 max-statements = 100
 
 [tool.mypy]
-packages = ["caf.toolkit"]
+packages = ["caf.viz"]
 ignore_missing_imports = true
 allow_redefinition = true
 
@@ -117,8 +117,8 @@ match = ["v*"]
 default-tag = "0.0.1"
 
 [tool.versioningit.onbuild]
-source-file = "src/caf/toolkit/_version.py"
-build-file = "caf/toolkit/_version.py"
+source-file = "src/caf/viz/_version.py"
+build-file = "caf/viz/_version.py"
 
 [tool.versioningit.format]
 distance = "{base_version}+{distance}.{vcs}{rev}"
