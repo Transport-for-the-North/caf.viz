@@ -3,11 +3,13 @@
 
 ##### IMPORTS #####
 
+# Built-Ins
 import itertools
 import logging
 import math
 from typing import Any, Callable, Concatenate
 
+# Third Party
 import numpy as np
 from matplotlib import axes, figure
 from matplotlib import pyplot as plt

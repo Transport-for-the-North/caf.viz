@@ -5,18 +5,21 @@
 
 from __future__ import annotations
 
+# Built-Ins
 import enum
 import logging
-from typing import Sequence
 import warnings
+from typing import Sequence
 
+# Third Party
+import matplotlib as mpl
 import numpy as np
 import pandas as pd
-import matplotlib as mpl
 from matplotlib import axes, figure, ticker
-from scipy import stats
 from pydantic import dataclasses
+from scipy import stats
 
+# Local Imports
 from caf.viz import subplots, utils
 
 ##### CONSTANTS #####
@@ -172,7 +175,7 @@ def axes_plot_xy(
         hexbin(fig, ax, data, cmap, **plot_kwargs)
 
     elif type_ in (XYPlotType.SCATTER, XYPlotType.SCATTER_DENSITY):
-        if len(data) > 1_000_000:
+        if len(data.data) > 1_000_000:
             warnings.warn(
                 "scatter plots may take a long time with "
                 "a lot of data, try hexbin plots instead",

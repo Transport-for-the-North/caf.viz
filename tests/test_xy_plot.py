@@ -3,16 +3,19 @@
 
 ##### IMPORTS #####
 
+# Built-Ins
 import itertools
 import pathlib
 from typing import Iterator
 
+# Third Party
 import numpy as np
 import pandas as pd
 import pytest
 from matplotlib import pyplot as plt
 from matplotlib.backends import backend_pdf
 
+# Local Imports
 import caf.viz as viz
 
 ##### CONSTANTS #####
