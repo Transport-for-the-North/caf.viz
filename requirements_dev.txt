@@ -1,5 +1,4 @@
 # # Packaging controls
-setuptools>=64.0.0
 
 # package linters
 black>=22.6.0
