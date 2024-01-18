@@ -17,9 +17,9 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "numpy>=1.19.0, <2.0.0",
-  "pandas>=1.4.0, <2.0.0",
-  "matplotlib>=3.8.2, <4.0.0",
+  "numpy>=1.19.0",
+  "pandas>=1.4.0",
+  "matplotlib>=3.8.2",
 ]
 
 [project.optional-dependencies]
@@ -36,7 +36,6 @@ test = [
   "pytest>=7.4.0",
   "pytest-cov>=4.1.0",
   "pytest-xdist>=3.3.1",
-  "tox>=3.24.3",
 ]
 
 [project.urls]
