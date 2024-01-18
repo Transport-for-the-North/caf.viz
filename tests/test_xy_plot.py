@@ -59,6 +59,8 @@ def test_plot(
     n_subplots: int,
 ):
     """Test `plot_xy` with different number of subplots for all plot types."""
+    plt.style.use("caf.viz.tfn")
+
     data, column_iter = random_data
     x_columns: list[str] = []
     y_columns: list[str] = []
