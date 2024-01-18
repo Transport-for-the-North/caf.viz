@@ -1,8 +1,12 @@
 """CAF package containing functionality for transport related visualisations."""
 # TODO(MB) Write a more detailed description of the package
+
 from matplotlib import pyplot as _plt
 
 from ._version import __version__
+
+# Setup default style
+import caf.viz
 
 _plt.style.use("caf.viz.tfn")
 
