@@ -1,3 +1,3 @@
-from . import _version
-
-__version__ = _version.get_versions()["version"]
+"""CAF package containing functionality for transport related visualisations."""
+# TODO(MB) Write a more detailed description of the package
+from ._version import __version__
