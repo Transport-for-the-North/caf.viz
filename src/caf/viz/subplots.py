@@ -9,7 +9,7 @@ import itertools
 import logging
 import math
 import sys
-from typing import Any, Callable, Concatenate, ParamSpec, TypeAlias, TypeVar
+from typing import Any, Callable, Concatenate, TypeAlias
 
 # Third Party
 import numpy as np
@@ -44,7 +44,7 @@ def subplotter(
 
     Parameters
     ----------
-    func : Callable[Concatenate[figure.Figure, axes.Axes, ...], None]
+    func : (figure.Figure, axes.Axes, ...) -> None
         Function to plot data onto the individual subplot axes,
         this will be call once with a single axes for each set of
         arguments in `plot_args`.
@@ -109,9 +109,7 @@ def subplotter(
 
 
 def grid_plot(
-    func: Callable[Concatenate[figure.Figure, axes.Axes, ...], None],
-    plot_args: list[dict[str, Any]],
-    **subplots_kwargs,
+    func: PlotFunction, plot_args: list[dict[str, Any]], **subplots_kwargs
 ) -> figure.Figure:
     """Plot subplots in a grid, axes plots are created using `func`.
 
@@ -120,7 +118,7 @@ def grid_plot(
 
     Parameters
     ----------
-    func : Callable[Concatenate[figure.Figure, axes.Axes, ...], None]
+    func : (figure.Figure, axes.Axes, ...) -> None
         Function to plot data onto the individual subplot axes,
         this will be call once with a single axes for each set of
         arguments in `plot_args`.
