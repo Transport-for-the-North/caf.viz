@@ -50,7 +50,7 @@ class CmapData:
     column: str
     label: str | None = None
     auto_label: bool = True
-    cmap: str = mpl.rcParams.get("image.cmap")
+    cmap: str = mpl.rcParams.get("image.cmap")  # type: ignore
 
     def get_label(self) -> str | None:
         """Return label for colorbar."""
@@ -89,7 +89,29 @@ def hexbin(
     gridsize: int = 50,
     colorbar: bool = True,
 ) -> None:
-    # TODO(MB) docstring
+    """Add hexbin plot to given `ax` and add colorbar to `fig`.
+
+    Parameters
+    ----------
+    fig : figure.Figure
+        Figure containing the plot Axes.
+    ax : axes.Axes
+        Axes to add hexbin plot to.
+    data : BasicData
+        Data for creating the hexbin plot.
+    cmap : CmapData, optional
+        Data for defining the hexbin colormap.
+    gridsize : int, default 50
+        Number of hexagons in the x-direction, i.e.
+        width of the hexbin grid.
+    colorbar : bool, default True
+        If True add colorbar to `fig`.
+
+    Raises
+    ------
+    KeyError
+        If colormap data column isn't present in `data.data`.
+    """
     weights = None
     if cmap is not None:
         if cmap.column not in data.data.columns:
@@ -110,7 +132,7 @@ def hexbin(
         return
 
     if cmap is None:
-        label = "Count"
+        label: str | None = "Count"
     else:
         label = cmap.get_label()
 
@@ -126,7 +148,30 @@ def scatter(
     colorbar: bool = True,
     # TODO(MB) Add keyword arguments to pass to `ax.scatter`
 ) -> None:
-    # TODO(MB) docstring
+    """Add scatter plot to given `ax`, with optional density colormap.
+
+    Parameters
+    ----------
+    fig : figure.Figure
+        Figure containing plot Axes.
+    ax : axes.Axes
+        Axes to add scatter plot to.
+    data : BasicData
+        DataFrame and columns containing data to be plotted.
+    density : bool, default False
+        Color scatter plot points based on the desntity,
+        uses gaussian_kde to estimate density.
+    cmap : CmapData, optional
+        Data for colouring scatter plot points,
+        cannot be used if `density` is True.
+    colorbar : bool, default True
+        If True and `density` is True add colour bar to `fig`.
+
+    Raises
+    ------
+    ValueError
+        If `cmap` is given and `density` is True.
+    """
     xy_data = data.data[[data.x_column, data.y_column]].values.T
     z_data = None
 
@@ -141,7 +186,7 @@ def scatter(
     elif density:
         # Calculate point density
         kernel = stats.gaussian_kde(xy_data)
-        z_data: np.ndarray = kernel(xy_data)
+        z_data = kernel(xy_data)
 
     if z_data is not None:
         # Sort the points by density, so that the densest points are plotted last
@@ -168,7 +213,31 @@ def axes_plot_xy(
     cmap: CmapData | None = None,
     **plot_kwargs,
 ) -> None:
-    # TODO(MB) docstring
+    """Add plot to given `ax` based on `type_`.
+
+    Parameters
+    ----------
+    fig : figure.Figure
+        Figure containing the Axes being plotted on.
+    ax : axes.Axes
+        Axes to create plot on.
+    type_ : XYPlotType
+        Type of plot to create
+    data : BasicData
+        Data for creating the plot.
+    cmap : CmapData, optional
+        Data for defining any colormaps used in the plot.
+
+    Raises
+    ------
+    NotImplementedError
+        For any plot types which haven't been implemented.
+
+    See Also
+    --------
+    XYPlotType: for plot types which can be used.
+    hexbin, scatter
+    """
     # TODO(MB) Validate columns are present in data
 
     if type_ == XYPlotType.HEXBIN:
@@ -215,7 +284,38 @@ def plot_xy(
     title: str | None = None,
     weight_column: None | str | Sequence[str] = None,
 ) -> figure.Figure:
-    # TODO(MB) Docstring
+    """Create a graph of `data` based on given columns.
+
+    Multiple subplots may be produced on the same figure
+    if multiple values are given for the columns.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Data to be plotted.
+    x_column, y_column : str | Sequence[str]
+        Name(s) of columns containing x (or y) values. If multiple
+        are given the figure will contain different subplots for each.
+    type_ : XYPlotType, default XYPlotType.SCATTER
+        Type of plot to add to axes.
+    title : str, optional
+        Title to add to figure.
+    weight_column : str | Sequence[str], optional
+        Column(s) containing data for creating colormaps
+        on the plots.
+
+    Returns
+    -------
+    figure.Figure
+        Figure with plots.
+
+    Raises
+    ------
+    ValueError
+        If `x_column` and `y_column` are sequences of different lengths.
+        If `weight_column` doesn't contain the same number of columns
+        as `x_column`.
+    """
     # TODO(MB) Add functionality to share a colorbar
     # TODO(MB) Add option to define subplot parameters and
     # switch to subplotter if nrows and ncols are given
