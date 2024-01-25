@@ -2,12 +2,14 @@
 """Functionality for helping creating figures with subplots."""
 
 ##### IMPORTS #####
+from __future__ import annotations
 
 # Built-Ins
 import itertools
 import logging
 import math
-from typing import Any, Callable, Concatenate
+import sys
+from typing import Any, Callable, Concatenate, ParamSpec, TypeAlias, TypeVar
 
 # Third Party
 import numpy as np
@@ -20,12 +22,16 @@ LOG = logging.getLogger(__name__)
 _FIGURE_WIDTH_FACTOR = 5
 _FIGURE_HEIGHT_FACTOR = 4
 
+# Python 3.10 raises an error when Concatenate ends with ellipsis,
+# although this should be allowed according to the Python docs
+if sys.version_info.major == 3 and sys.version_info.minor > 10:
+    PlotFunction: TypeAlias = Callable[Concatenate[figure.Figure, axes.Axes, ...], None]
 
 ##### FUNCTIONS & CLASSES #####
 
 
 def subplotter(
-    func: Callable[Concatenate[figure.Figure, axes.Axes, ...], None],
+    func: PlotFunction,
     plot_args: list[dict[str, Any]],
     nrows: int,
     ncols: int,
