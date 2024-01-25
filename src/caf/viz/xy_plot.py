@@ -197,7 +197,7 @@ def scatter(
     points = ax.scatter(xy_data[0], xy_data[1], c=z_data)
 
     if not colorbar or z_data is None:
-        return None
+        return
 
     if cmap is not None:
         fig.colorbar(points, ax=ax, label=cmap.get_label())
