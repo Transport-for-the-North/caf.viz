@@ -146,7 +146,7 @@ def scatter(
     density: bool = False,
     cmap: CmapData | None = None,
     colorbar: bool = True,
-    # TODO(MB) Add keyword arguments to pass to `ax.scatter`
+    **kwargs,
 ) -> None:
     """Add scatter plot to given `ax`, with optional density colormap.
 
@@ -166,11 +166,19 @@ def scatter(
         cannot be used if `density` is True.
     colorbar : bool, default True
         If True and `density` is True add colour bar to `fig`.
+    kwargs : Keyword arguments
+        Additional keyword arguments to pass to `ax.scatter`,
+        'c' parameter will be ignored if `density` or `cmap`
+        are used.
 
     Raises
     ------
     ValueError
         If `cmap` is given and `density` is True.
+
+    See Also
+    --------
+    axes.Axes.scatter: base matplotlib method for creating scatter plots.
     """
     xy_data = data.data[[data.x_column, data.y_column]].values.T
     z_data = None
@@ -193,6 +201,13 @@ def scatter(
         idx = z_data.argsort()
         z_data = z_data[idx]
         xy_data = np.take(xy_data, idx, axis=1)
+
+        if "c" in kwargs:
+            warnings.warn("`c` parameter cannot be used if `cmap` or `density` is provided")
+            kwargs.pop("c")
+
+    else:
+        z_data = kwargs.pop("c", None)
 
     points = ax.scatter(xy_data[0], xy_data[1], c=z_data)
 
@@ -238,8 +253,6 @@ def axes_plot_xy(
     XYPlotType: for plot types which can be used.
     hexbin, scatter
     """
-    # TODO(MB) Validate columns are present in data
-
     if type_ == XYPlotType.HEXBIN:
         hexbin(fig, ax, data, cmap, **plot_kwargs)
 
@@ -316,9 +329,6 @@ def plot_xy(
         If `weight_column` doesn't contain the same number of columns
         as `x_column`.
     """
-    # TODO(MB) Add functionality to share a colorbar
-    # TODO(MB) Add option to define subplot parameters and
-    # switch to subplotter if nrows and ncols are given
     type_ = XYPlotType(type_)
 
     if isinstance(x_column, str) and isinstance(y_column, str):

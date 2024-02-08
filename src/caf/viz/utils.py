@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Miscalellaneous utility functions for visualisation."""
+"""Miscellaneous utility functions for visualisation."""
 
 ##### IMPORTS #####
 
