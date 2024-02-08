@@ -20,4 +20,8 @@ there.
 Below, a brief summary of patches made since the previous version can be found.
 
 ### V0.1.0
-- List patch notes here
+
+- Added functionality for creating 2D plots
+  - Hexbin plots
+  - Scatter plots with optional density colouring
+- Added functionality for generating subplot figures
