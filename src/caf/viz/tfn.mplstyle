@@ -11,7 +11,7 @@ axes.edgecolor: b2b2b2
 axes.titlesize: large
 axes.labelsize: medium
 # TfN colors: navy, teal, purple, pink, orange, ice, yellow, dark_green, green
-axes.prop_cycle: cycler("color", ["0d0f0d", "00dec6", "7317de", "e50080", "f15a29", "66ffff", "e9e623", "1f3529", "a0ca2a"])
+axes.prop_cycle: cycler("color", ["0d0f3d", "00dec6", "7317de", "e50080", "f15a29", "66ffff", "e9e623", "1f3529", "a0ca2a"])
 
 grid.color: b2b2b2
 grid.linestyle: --
