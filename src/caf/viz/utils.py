@@ -39,6 +39,7 @@ def style_names() -> list[str]:
     >>> from matplotlib import pyplot as plt
     >>> plt.style.use("caf.viz.tfn")
     """
-    styles = core.read_style_directory(_PACKAGE_PATH)
+    # MyPy false positive for missing function
+    styles = core.read_style_directory(_PACKAGE_PATH)  # type: ignore
 
     return list(styles)
