@@ -25,3 +25,4 @@ Below, a brief summary of patches made since the previous version can be found.
   - Hexbin plots
   - Scatter plots with optional density colouring
 - Added functionality for generating subplot figures
+- Fix including custom matplotlib styles within package
