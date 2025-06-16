@@ -9,7 +9,7 @@ from __future__ import annotations
 import enum
 import logging
 import warnings
-from typing import Sequence
+from typing import Sequence, Optional
 
 # Third Party
 import matplotlib as mpl
@@ -60,6 +60,24 @@ class CmapData:
             return self.column
         return None
 
+@dataclasses.dataclass(config={"arbitrary_types_allowed": True})
+class BarData:
+    "bar chart data"
+    data: pd.DataFrame
+    value_column: str
+    label_column: str
+    title: str
+    x_label: str
+    y_label: str
+
+    @property
+    def labels(self) -> list[str]:
+        "get bar labels"
+        return list(self.data[self.label_column].values)
+    @property
+    def values(self) -> np.ndarray:
+        "get values for bars"
+        return self.data[self.value_column].values
 
 class XYPlotType(enum.Enum):
     """Types of 2D XY plots."""
@@ -67,6 +85,7 @@ class XYPlotType(enum.Enum):
     SCATTER = "scatter"
     SCATTER_DENSITY = "scatter_density"
     HEXBIN = "hexbin"
+    BAR = "bar"
 
     @classmethod
     def _missing_(cls, value) -> XYPlotType | None:
@@ -204,6 +223,15 @@ def scatter(
     else:
         fig.colorbar(points, ax=ax, label="Density", ticks=ticker.NullLocator())
 
+def bar(
+    fig: figure.Figure,
+    ax: axes.Axes,
+    data: BarData,
+)-> None:
+    ax.bar(data.labels, data.values)
+    ax.set_xlabel(data.x_label)
+    ax.set_ylabel(data.y_label)
+    ax.set_title(data.title)
 
 def axes_plot_xy(
     fig: figure.Figure,
