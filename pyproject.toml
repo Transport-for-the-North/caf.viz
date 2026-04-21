@@ -50,7 +50,7 @@ Source = "https://github.com/Transport-for-the-North/caf.viz"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"caf.viz" = ["py.typed"]
+"caf.viz" = ["py.typed", "*.mplstyle"]
 
 # Linters
 [tool.black]

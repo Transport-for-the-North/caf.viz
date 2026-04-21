@@ -16,7 +16,7 @@ from matplotlib import pyplot as plt
 from matplotlib.backends import backend_pdf
 
 # Local Imports
-import caf.viz as viz
+from caf.viz import xy_plot
 
 ##### CONSTANTS #####
 
@@ -72,8 +72,8 @@ def test_plot(
 
     out_file = tmp_path / "test_plots.pdf"
     with backend_pdf.PdfPages(out_file) as pdf:
-        for type_ in viz.XYPlotType:
-            fig = viz.plot_xy(
+        for type_ in xy_plot.XYPlotType:
+            fig = xy_plot.plot_xy(
                 data,
                 x_columns,
                 y_columns,
