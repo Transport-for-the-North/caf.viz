@@ -366,3 +366,59 @@ def plot_xy(
         fig.suptitle(title)
 
     return fig
+
+def plot_tld(
+    cost_dist,
+    ax=None, 
+    *,
+    show_weighted_avg=True,
+    title="Trip Length Distribution",
+    xlabel="Trip Length",
+    ylabel=None,
+):
+    """
+    Plot a standard Trip Length Distribution (TLD) from a CostDistribution.
+    """
+
+    mins = cost_dist.min_vals
+    maxs = cost_dist.max_vals
+    avgs = cost_dist.avg_vals
+    trips = cost_dist.trip_vals
+
+    # Create axis if needed
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+    # Bin widths
+    widths = maxs - mins
+
+    # Plot bars
+    ax.bar(
+        avgs,
+        values,
+        width=widths,
+        align="center",
+        edgecolor="black"
+    )
+
+    # Weighted average 
+    if show_weighted_avg:
+        total_trips = np.sum(trips)
+        if total_trips > 0:
+            weighted_avg = np.sum(cost_dist.weighted_avg_vals * trips) / total_trips
+
+            ax.axvline(
+                weighted_avg,
+                color="red",
+                linestyle="--",
+                label=f"Weighted Avg: {weighted_avg:.2f}"
+            )
+            ax.legend()
+
+    # Formatting
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.grid(True, linestyle="--", alpha=0.5)
+
+    return ax
