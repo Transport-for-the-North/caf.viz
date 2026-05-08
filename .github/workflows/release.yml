@@ -17,8 +17,6 @@ permissions:
 
 jobs:
   deploy:
-    # Disabled until PyPI publishing is setup
-    if: false
     timeout-minutes: 3
 
     runs-on: ubuntu-latest
