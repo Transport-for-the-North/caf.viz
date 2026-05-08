@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Functionality for plotting of general X / Y data."""
 
 ##### IMPORTS #####
@@ -9,12 +8,11 @@ from __future__ import annotations
 import enum
 import logging
 import warnings
-from typing import Sequence
+from typing import TYPE_CHECKING
 
 # Third Party
 import matplotlib as mpl
 import numpy as np
-import pandas as pd
 from matplotlib import axes, figure, ticker
 from pydantic import dataclasses
 from scipy import stats
@@ -22,9 +20,15 @@ from scipy import stats
 # Local Imports
 from caf.viz import subplots, utils
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    import pandas as pd
+
 ##### CONSTANTS #####
 
 LOG = logging.getLogger(__name__)
+_SCATTER_WARNING_COUNT = 1_000_000
 
 
 ##### FUNCTIONS & CLASSES #####
@@ -50,7 +54,7 @@ class CmapData:
     column: str
     label: str | None = None
     auto_label: bool = True
-    cmap: str = mpl.rcParams.get("image.cmap")  # type: ignore
+    cmap: str = mpl.rcParams.get("image.cmap")  # type: ignore[assignment]
 
     def get_label(self) -> str | None:
         """Return label for colorbar."""
@@ -69,7 +73,7 @@ class XYPlotType(enum.Enum):
     HEXBIN = "hexbin"
 
     @classmethod
-    def _missing_(cls, value) -> XYPlotType | None:
+    def _missing_(cls, value) -> XYPlotType | None:  # noqa: ANN001
         normal = utils.normalise_name(str(value))
         for member in cls:
             if member.value == normal:
@@ -180,7 +184,7 @@ def scatter(
     --------
     axes.Axes.scatter: base matplotlib method for creating scatter plots.
     """
-    xy_data = data.data[[data.x_column, data.y_column]].values.T
+    xy_data = data.data[[data.x_column, data.y_column]].to_numpy().T
     z_data = None
 
     if cmap is not None and density:
@@ -203,7 +207,9 @@ def scatter(
         xy_data = np.take(xy_data, idx, axis=1)
 
         if "c" in kwargs:
-            warnings.warn("`c` parameter cannot be used if `cmap` or `density` is provided")
+            warnings.warn(
+                "`c` parameter cannot be used if `cmap` or `density` is provided", stacklevel=2
+            )
             kwargs.pop("c")
 
     else:
@@ -257,11 +263,12 @@ def axes_plot_xy(
         hexbin(fig, ax, data, cmap, **plot_kwargs)
 
     elif type_ in (XYPlotType.SCATTER, XYPlotType.SCATTER_DENSITY):
-        if len(data.data) > 1_000_000:
+        if len(data.data) > _SCATTER_WARNING_COUNT:
             warnings.warn(
                 "scatter plots may take a long time with "
                 "a lot of data, try hexbin plots instead",
                 RuntimeWarning,
+                stacklevel=2,
             )
         scatter(
             fig,
@@ -352,7 +359,7 @@ def plot_xy(
             )
 
     plot_data = []
-    for i, (x, y) in enumerate(zip(x_column, y_column)):
+    for i, (x, y) in enumerate(zip(x_column, y_column, strict=True)):
         plot_data.append(
             dict(
                 type_=type_,
