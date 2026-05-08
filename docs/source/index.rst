@@ -15,8 +15,8 @@ CAF.viz source code is available on `GitHub <https://github.com/transport-for-th
 Common Analytical Framework
 ---------------------------
 
-This package is sits within the `Common Analytical Framework (CAF) <https://transport-for-the-north.github.io/caf_homepage/intro.html>`_,
-which is a collaboration between transport bodies in the UK to develop and maintain commonly use
+This package sits within the `Common Analytical Framework (CAF) <https://transport-for-the-north.github.io/caf_homepage/intro.html>`_,
+which is a collaboration between transport bodies in the UK to develop and maintain commonly used
 transport analytics and appraisal tools.
 
 Contents

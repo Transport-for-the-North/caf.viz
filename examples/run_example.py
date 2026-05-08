@@ -1,11 +1,11 @@
 """
-Ran Example
+Run Example
 ===========
 
-This is an example of a code example which is displayed **and** ran.
+This is an example of a code example which is displayed **and** run.
 
 .. note::
-    See :ref:`example` for an example which is displayed but **not** ran.
+    See :ref:`example` for an example which is displayed but **not** run.
 
 The examples can include documentation in the docstrings and comments alongside
 the code and outputs. Text uses the reStructuredText format, the same as other
