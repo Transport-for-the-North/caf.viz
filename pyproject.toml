@@ -4,46 +4,36 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "caf.viz"
-dynamic = ["version"]
-description = "Python-based visualisation tools for transport data"
+dynamic = ["version", "dependencies", "optional-dependencies"]
+description = "Visualisation functionality and tools for transport related data."
 readme = "README.md"
-license = { file = "LICENSE" }
-requires-python = ">=3.10"
+license = { "file" = "LICENSE" }
+requires-python = ">=3.11"
 authors = [{ name = "Transport for the North" }]
 classifiers = [
-  "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-]
-dependencies = [
-  "numpy>=1.19.0",
-  "pandas>=1.4.0",
-  "matplotlib>=3.8.2",
-  "scipy>=1.11.4",
-  "pydantic>=2.0",
-]
-
-[project.optional-dependencies]
-lint = [
-  "black>=22.6.0",
-  "isort>=5.12.0",
-  "mypy>=1.0.0",
-  "mypy_extensions>=1.0.0",
-  "pydocstyle[toml]>=6.1.1",
-  "pylint>=2.14.5",
-]
-
-test = [
-  "pytest>=7.4.0",
-  "pytest-cov>=4.1.0",
-  "pytest-xdist>=3.3.1",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 
 [project.urls]
-"Bug Tracker" = "https://github.com/Transport-for-the-North/caf.viz/issues"
-Homepage = "https://github.com/Transport-for-the-North/caf.viz"
-Source = "https://github.com/Transport-for-the-North/caf.viz"
+"Bug Tracker" = "https://github.com/transport-for-the-north/caf.viz/issues"
+Homepage = "https://github.com/transport-for-the-north/caf.viz"
+Source = "https://github.com/transport-for-the-north/caf.viz"
+Documentation = "http://cafviz.readthedocs.io/"
+
+[tool.setuptools.dynamic]
+dependencies = { "file" = "requirements.txt" }
+
+[tool.setuptools.dynamic.optional-dependencies]
+dev = { "file" = "requirements_dev.txt" }
+docs = { "file" = "docs/requirements.txt" }
+
+# Dynamic versioning for editable installs
+[tool.setuptools.cmdclass]
+build_py = "versioningit.cmdclass.build_py"
+sdist = "versioningit.cmdclass.sdist"
 
 # Packaging options
 [tool.setuptools.packages.find]
@@ -53,65 +43,138 @@ where = ["src"]
 "caf.viz" = ["py.typed", "*.mplstyle"]
 
 # Linters
-[tool.black]
+[tool.ruff]
 line-length = 95
-target-version = ['py310']
+target-version = "py311"
+extend-exclude = ["conf.py", "_version.py"]
 
-[tool.pylint.messages_control]
-disable = [
-  "line-too-long",    # Compatibility with black
-  "too-many-lines",
-  "use-dict-literal",
-  "use-list-literal",
+[tool.ruff.lint]
+select = [
+    "A",    # flake8-builtins
+    "E",    # pycodestyle
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "I",    # isort
+    "LOG",  # flake8-logging
+    "G",    # flake8-logging-format
+    "N",    # pep8-naming
+    "D",    # pydocstyle
+    "DOC",  # pydoclint
+    "PL",   # pylint
+    "BLE",  # flake8-blind-except
+    "ERA",  # eradicate (commented out code)
+    "TD",   # flake8-todos
+    "RET",  # flake8-return
+    "PTH",  # flake8-use-pathlib
+    "ANN",  # flake8-annotations
+    "S",    # flake8-bandit (security issues)
+    "ICN",  # flake8-import-conventions
+    "ARG",  # flake8-unused-arguments
+    "PIE",  # flake8-pie
+    "FURB", # refurb
+    "RUF",  # Ruff-specific rules
+    "TRY",  # tryceratops checks
+    "C90",  # mccabe (complex code)
+    "PD",   # pandas-vet (pandas best practices)
+    "TC",   # flake8-type-checking
+    "T20",  # flake8-print (disallow print statements)
+    "PGH",  # pygrep-hooks (noqa and type disable comments)
+]
+ignore = [
+    # These clash with the ruff formatter
+    "W191", # tab-indentation
+    "E111", # indentation-with-invalid-multiple
+    "E114", # indentation-with-invalid-multiple-comment
+    "E117", # over-indented
+    "D206", # docstring-tab-indentation
+    "D300", # triple-single-quotes
+
+    "UP015",  # redundant-open-modes (pyupgrade)
+    "TRY003", # long messages in exceptions (tryceratops)
+    "SIM108", # one line if else (flake8-bandit)
+    "S311",   # random.random not allowed (flake8-bandit)
+    "DOC502", # docstring-extraneous-exception (sometimes necessary)
+    "ANN003", # type annotation for **kwargs
+]
+unfixable = [
+    "T20",  # print-statements (flake8-print)
+    "B905", # zip without strict, fix defaults to False
 ]
 
-[tool.isort]
-profile = "black"
-src_paths = ["src", "tests"]
+[tool.ruff.lint.extend-per-file-ignores]
+"__init__.py" = ["F401"] # allow unused imports
+"tests/*" = [
+    "S101", # use of assert in tests
+    "DOC",  # docstring issues
+]
+"examples/*" = [
+    "T20",  # allow print statements
+    "D205", # allow one-liner docstrings
+    "D400", # allow missing first line in docstrings
+]
 
-skip = ["__init__.py", "_version.py"]
-skip_glob = [".*"]
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
 
-# Section commenting
-import_heading_stdlib = "Built-Ins"
-import_heading_thirdparty = "Third Party"
-import_heading_firstparty = "Local Imports"
+[tool.ruff.lint.pep8-naming]
+ignore-names = ["df", "fn", "ca", "tp", "x", "i"]
 
-# Pylint settings
-[tool.pylint.basic]
-good-names = ["df", "fn", "ca", "tp", "to", "x", "x1", "x2", "i", "f", "q"]
-extension-pkg-allow-list = ["pydantic"]
+[tool.ruff.lint.flake8-import-conventions.extend-aliases]
+# Recommended aliases for caf packages
+"caf.toolkit" = "ctk"
+"caf.base" = "cbase"
+"caf.mat" = "cmat"
+"caf.space" = "cspace"
+"caf.distribute" = "cdist"
+"caf.viz" = "cviz"
 
-[tool.pylint.main]
-ignore = ["__init__.py", "_version.py", "versioneer.py"]
+[tool.ruff.lint.pylint]
+max-args = 10
+max-statements = 100
 
+[tool.ruff.format]
+docstring-code-format = true
+
+# Only necessary until pylint is fully covered by ruff
 [tool.pylint.design]
 max-args = 10
 max-attributes = 15
 max-statements = 100
 
+[tool.pylint.messages_control]
+disable = [
+    "line-too-long",         # Handled by ruff
+    "too-many-lines",
+    "use-dict-literal",
+    "use-list-literal",
+    "wrong-import-position", # Compatibility with ruff
+    "wrong-import-order",    # Handled by ruff
+    "ungrouped-imports",     # Handled by ruff
+]
+
+[tool.pylint.basic]
+extension-pkg-allow-list = []
+
+[tool.pylint.main]
+ignore = ["__init__.py", "_version.py"]
+
 [tool.mypy]
 packages = ["caf.viz"]
+namespace_packages = true
 ignore_missing_imports = true
 allow_redefinition = true
-
-[tool.pydocstyle]
-convention = "numpy"
-match = '(?!_test)(?!test_)(?!__init__).*\.py'
-add-ignore = [
-  "D202", # Temporary compatibility with black
-]
 
 # Tests
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-addopts = '--cov=caf --cov-report=xml --doctest-modules -n auto'
-doctest_optionflags = "NORMALIZE_WHITESPACE"
-markers = [
-  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-  "integration: integration tests, these may require manual checks of the outputs",
-  "serial: marks tests to not run in parallel",
-]
+addopts = """\
+    --cov=caf --cov-report=xml -n auto \
+    --doctest-modules --ignore=examples \
+    --junitxml=junit.xml -o junit_family=legacy\
+    """
 
 [tool.coverage.report]
 include_namespace_packages = true
@@ -129,5 +192,4 @@ build-file = "caf/viz/_version.py"
 [tool.versioningit.format]
 distance = "{base_version}+{distance}.{vcs}{rev}"
 dirty = "{base_version}+{distance}.{vcs}{rev}.dirty"
-
 distance-dirty = "{base_version}+{distance}.{vcs}{rev}.dirty"

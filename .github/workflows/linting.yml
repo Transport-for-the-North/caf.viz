@@ -9,21 +9,28 @@ on:
   pull_request:
     branches: main
 
+permissions:
+  contents: read
+
 jobs:
   lint:
-
+    timeout-minutes: 3
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            requirements_dev.txt
 
       - name: Install dependencies
         run: |
@@ -31,14 +38,13 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements_dev.txt
 
+      - name: Lint with ruff
+        run: |
+          ruff check --no-fix
+          ruff format --check --diff
+
+      # Ruff doesn't currently support all pylint options
+      # see https://github.com/astral-sh/ruff/issues/970
       - name: Lint with PyLint
         run: |
           pylint src
-
-      - name: Lint with MyPy
-        run: |
-          mypy src
-
-      - name: Lint with PyDocStyle
-        run: |
-          pydocstyle src
