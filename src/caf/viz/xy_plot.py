@@ -89,6 +89,7 @@ def hexbin(
     fig: figure.Figure,
     ax: axes.Axes,
     data: BasicData,
+    *,
     cmap: CmapData | None = None,
     gridsize: int = 50,
     colorbar: bool = True,
@@ -147,6 +148,7 @@ def scatter(
     fig: figure.Figure,
     ax: axes.Axes,
     data: BasicData,
+    *,
     density: bool = False,
     cmap: CmapData | None = None,
     colorbar: bool = True,
@@ -260,7 +262,7 @@ def axes_plot_xy(
     hexbin, scatter
     """
     if type_ == XYPlotType.HEXBIN:
-        hexbin(fig, ax, data, cmap, **plot_kwargs)
+        hexbin(fig, ax, data, cmap=cmap, **plot_kwargs)
 
     elif type_ in (XYPlotType.SCATTER, XYPlotType.SCATTER_DENSITY):
         if len(data.data) > _SCATTER_WARNING_COUNT:
@@ -301,6 +303,7 @@ def plot_xy(
     x_column: str | Sequence[str],
     y_column: str | Sequence[str],
     type_: XYPlotType = XYPlotType.SCATTER,
+    *,
     title: str | None = None,
     weight_column: None | str | Sequence[str] = None,
 ) -> figure.Figure:
