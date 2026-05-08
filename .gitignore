@@ -160,3 +160,6 @@ dmypy.json
 # Specific configs can be included using '!' https://git-scm.com/docs/gitignore#_pattern_format
 # All configs in the examples folder are included
 !examples/*.yml
+!.github/**/*.yml
+!.readthedocs.yaml
+!.codecov.yml
