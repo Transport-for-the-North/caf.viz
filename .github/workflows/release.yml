@@ -17,8 +17,12 @@ permissions:
 
 jobs:
   deploy:
+    # Disabled until PyPI publishing is setup
+    if: false
+    timeout-minutes: 3
+
     runs-on: ubuntu-latest
-    
+
     # Specifying a GitHub environment is optional, but strongly encouraged
     environment: release
     permissions:
@@ -26,9 +30,9 @@ jobs:
       id-token: write
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: '3.x'
 
@@ -40,5 +44,5 @@ jobs:
     - name: Build package
       run: python -m build
 
-    - name: Publish package to pyPI
+    - name: Publish package
       uses: pypa/gh-action-pypi-publish@release/v1

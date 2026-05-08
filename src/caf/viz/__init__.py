@@ -1,5 +1,3 @@
-"""CAF package containing functionality for transport related visualisations."""
+"""Visualisation functionality and tools for transport related data."""
 
 from ._version import __version__
-
-# Aliases
