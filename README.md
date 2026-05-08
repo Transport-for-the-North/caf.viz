@@ -57,7 +57,7 @@ Visualisation functionality and tools for transport related data.
 - [Where to get it](#where-to-get-it)
   - [Installation from GitHub](#installation-from-github)
 - [Usage](#usage)
-  - [Command Line](#command-line)
+  <!-- - [Command Line](#command-line)-->
 - [Documentation](#documentation)
 - [What is CAF?](#what-is-caf)
 - [Contribution](#contribution)
@@ -73,14 +73,15 @@ Visualisation functionality and tools for transport related data.
 
 ### Main Features
 
-> [!IMPORTANT]
-> This section of the README hasn't been written yet.
-
-- **Feature 1** - description
+- **Simplified 2D graphs** - wrappers around matplotlib to simplify the creation of
+  basic 2D plots (scatter, line and hexbin) and to simplify the creation of figures
+  with multiple Axes.
+- **TfN Stylesheet** - custom stylesheet for matplotlib using TfN's colour scheme.
 
 #### Work-in-Progress
 
-- **Work in progress feature** - description of feature not yet release.
+- **Static Heatmaps** - wrapper around GeoPandas and matplotlib to simplify the creation
+  of heatmap images (see #24).
 
 > [!WARNING]
 > These features are work-in-progress and are not available in a released version of caf.viz, to
@@ -88,8 +89,8 @@ Visualisation functionality and tools for transport related data.
 
 ### Who is it for?
 
-- **Target audience:** *TODO*
-- **CAF Analytical Stage:** *TODO*
+- **Target audience:** GIS Analysts, Transport Analysts, Data Analysts
+- **CAF Analytical Stage:** Analysis, Appraisal, Evaluation
 
 ![CAF Analytical Process Diagram](https://github.com/Transport-for-the-North/.github/blob/21a428e81880639839e221940881572cdee24d5a/profile/ProcessDiagram.png?raw=true)
 
@@ -101,6 +102,7 @@ For more details on CAF Analytical Stages see the [description within TfN's GitH
 > caf.viz has not been published yet so cannot be installed from
 > conda-forge or PyPI, see [Installation from GitHub](#installation-from-github).
 
+<!--
 The latest released version are available at the [Python
 Package Index (PyPI)](https://pypi.org/project/caf.viz) and on [Conda](https://anaconda.org/conda-forge/caf.viz).
 
@@ -111,6 +113,7 @@ conda install -c conda-forge caf.viz
 ```sh
 pip install caf.viz
 ```
+-->
 
 > [!TIP]
 >
@@ -134,10 +137,11 @@ pip install "git+https://github.com/transport-for-the-north/caf.viz"
 
 ## Usage
 
-caf.viz provides and Command-line (CLI) and graphical interface (GUI) to use many of it's
-features without the need to write any Python code, see the [Tool Usage section](https://cafviz.readthedocs.io/en/stable/usage/index.html)
+CAF.viz doesn't currently provide a CLI or GUI so should be called from Python to use,
+see the [Tool Usage section](https://cafviz.readthedocs.io/en/stable/usage/index.html)
 of the user guide for more details.
 
+<!--
 ### Command Line
 
 The tool can be run from command line, with the command:
@@ -148,6 +152,7 @@ caf.viz
 
 See [Command-Line Interface (User Guide)](https://cafviz.readthedocs.io/en/stable/usage/cli.html)
 for full explanations of the parameters.
+-->
 
 ## Documentation
 
