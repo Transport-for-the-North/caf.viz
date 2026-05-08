@@ -98,13 +98,9 @@ For more details on CAF Analytical Stages see the [description within TfN's GitH
 
 ## Where to get it
 
-> [!IMPORTANT]
-> caf.viz has not been published yet so cannot be installed from
-> conda-forge or PyPI, see [Installation from GitHub](#installation-from-github).
-
-<!--
-The latest released version are available at the [Python
-Package Index (PyPI)](https://pypi.org/project/caf.viz) and on [Conda](https://anaconda.org/conda-forge/caf.viz).
+The latest released version are available at the
+[Python Package Index (PyPI)](https://pypi.org/project/caf.viz) and on
+[Conda](https://anaconda.org/conda-forge/caf.viz).
 
 ```sh
 conda install -c conda-forge caf.viz
@@ -113,7 +109,6 @@ conda install -c conda-forge caf.viz
 ```sh
 pip install caf.viz
 ```
--->
 
 > [!TIP]
 >
