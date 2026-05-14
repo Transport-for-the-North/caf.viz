@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """WIP Functionality for creating static heatmaps with GeoPandas."""
 
 ##### IMPORTS #####
@@ -6,18 +5,20 @@ from __future__ import annotations
 
 # Standard imports
 import dataclasses
+import itertools
 import logging
 import math
 import re
-from typing import Any, NamedTuple, Optional, Union
 import warnings
+from typing import Any, NamedTuple
 
 # Third party imports
 import geopandas as gpd
 import mapclassify
 import numpy as np
-from matplotlib import cm, patches, pyplot as plt
 import pandas as pd
+from matplotlib import cm, patches
+from matplotlib import pyplot as plt
 from shapely import geometry
 
 # Local imports
@@ -56,7 +57,7 @@ class Bounds(NamedTuple):
 
 
 @dataclasses.dataclass
-class LegendLabelValues:
+class _LegendLabelValues:
     lower: float
     upper: float
     lower_formatted: str
@@ -64,7 +65,7 @@ class LegendLabelValues:
 
 
 ##### FUNCTIONS #####
-def _extract_legend_values(text: str) -> Optional[LegendLabelValues]:
+def _extract_legend_values(text: str) -> _LegendLabelValues | None:
     """Extract numbers and formatted strings from legend label."""
     number = r"\d+(?:\.\d*)?"
     units = r"%?"
@@ -76,11 +77,11 @@ def _extract_legend_values(text: str) -> Optional[LegendLabelValues]:
         rf"(?P<upper_units>{units})"
     )
 
-    match: Optional[re.Match] = re.search(pattern, text)
+    match: re.Match | None = re.search(pattern, text)
     if match is None:
         return match
 
-    return LegendLabelValues(
+    return _LegendLabelValues(
         lower=float(match.group("lower")),
         upper=float(match.group("upper")),
         lower_formatted="{}{}".format(match.group("lower"), match.group("lower_units")),
@@ -93,8 +94,8 @@ def _colormap_classify(
     cmap_name: str,
     n_bins: int = 5,
     label_fmt: str = "{:.0f}",
-    bins: Optional[list[int | float]] = None,
-    nan_colour: Optional[tuple[float, float, float, float]] = None,
+    bins: list[int | float] | None = None,
+    nan_colour: tuple[float, float, float, float] | None = None,
 ) -> CustomCmap:
     """Calculate a NaturalBreaks colour map."""
 
@@ -140,9 +141,10 @@ def _colormap_classify(
             min_bin = -np.inf
 
     bins = [min_bin, *mc_bins.bins]
-    labels = [make_label(l, u) for l, u in zip(bins[:-1], bins[1:])]
+    labels = [make_label(i, j) for i, j in itertools.pairwise(bins)]
     legend = [
-        patches.Patch(fc=c, label=l, ls="") for c, l in zip(cmap(range(mc_bins.k)), labels)
+        patches.Patch(fc=i, label=j, ls="")
+        for i, j in zip(cmap(range(mc_bins.k)), labels, strict=True)
     ]
 
     if nan_colour is not None:
@@ -176,13 +178,13 @@ def _mapclassify_natural(
         try:
             return mapclassify.NaturalBreaks(y, k, initial)
         except ValueError:
-            if k <= 2:
+            if k <= 2:  # noqa: PLR2004
                 raise
             k -= 1
 
 
 def _add_poly_boundary(
-    ax: plt.Axes, area: Union[geometry.MultiPolygon, geometry.Polygon]
+    ax: plt.Axes, area: geometry.MultiPolygon | geometry.Polygon
 ) -> patches.Polygon:
     """Add analytical area boundary to a map.
 
@@ -223,6 +225,10 @@ def _add_poly_boundary(
         if i == 0:
             legend_patch = patch
         ax.add_patch(patch)
+
+    if legend_patch is None:
+        raise ValueError("no polygons plotted")
+
     return legend_patch
 
 
@@ -230,15 +236,16 @@ def heatmap_figure(
     geodata: gpd.GeoDataFrame,
     column_name: str,
     title: str,
-    bins: Optional[list[Union[int, float]]] = None,
+    bins: list[int | float] | None = None,
     n_bins: int = 5,
-    polygon_boundary: Union[geometry.Polygon, geometry.MultiPolygon] = None,
+    polygon_boundary: geometry.Polygon | geometry.MultiPolygon = None,
     positive_negative_colormaps: bool = False,
     legend_label_fmt: str = "{:.1%}",
-    legend_title: Optional[str] = None,
-    zoomed_bounds: Optional[Bounds] = Bounds(300000, 150000, 600000, 500000),
-    missing_kwds: Optional[dict[str, Any]] = None,
-):
+    legend_title: str | None = None,
+    zoomed_bounds: Bounds | None = None,
+    missing_kwds: dict[str, Any] | None = None,
+    annotation: str | None = None,
+) -> plt.Figure:
     legend_kwargs = dict(title_fontsize="large", fontsize="medium")
 
     ncols = 1 if zoomed_bounds is None else 2
@@ -247,7 +254,7 @@ def heatmap_figure(
         1, ncols, figsize=(20, 15), frameon=False, constrained_layout=True
     )
     if ncols == 1:
-        axes = [axes]
+        axes: list[plt.Axes] = [axes]  # type: ignore[no-redef]
 
     fig.suptitle(title, fontsize="xx-large", backgroundcolor="white")
     for ax in axes:
@@ -261,16 +268,13 @@ def heatmap_figure(
     if polygon_boundary is not None:
         axes[0].legend(**legend_kwargs, loc="upper right")
 
-    # Drop nan
-    # geodata = geodata.loc[~geodata[column_name].isna()]
-
     kwargs = dict(
         column=column_name,
         cmap="viridis_r",
         scheme="NaturalBreaks",
         k=7,
         legend_kwds=dict(
-            title=legend_title if legend_title else str(column_name).title(),
+            title=legend_title or str(column_name).title(),
             **legend_kwargs,
             loc="upper right",
         ),
@@ -285,7 +289,7 @@ def heatmap_figure(
     )
 
     if missing_kwds is not None:
-        kwargs["missing_kwds"].update(missing_kwds)
+        kwargs["missing_kwds"].update(missing_kwds)  # type: ignore[attr-defined]
 
     if positive_negative_colormaps:
         # Calculate, and apply, separate colormaps for positive and negative values
@@ -318,7 +322,10 @@ def heatmap_figure(
                 edgecolor=kwargs["edgecolor"],
                 missing_kwds=kwargs["missing_kwds"],
             )
-        axes[ncols - 1].legend(handles=cmap.legend_elements, **kwargs.pop("legend_kwds"))
+        axes[ncols - 1].legend(
+            handles=cmap.legend_elements,
+            **kwargs.pop("legend_kwds"),  # type: ignore[arg-type]
+        )
 
     else:
         if bins:
@@ -334,12 +341,12 @@ def heatmap_figure(
         warnings.simplefilter("error", category=UserWarning)
         try:
             geodata.plot(ax=axes[0], legend=False, **kwargs)
-            if ncols == 2:
+            if zoomed_bounds is not None:
                 geodata.plot(ax=axes[1], legend=True, **kwargs)
         except UserWarning:
             kwargs["scheme"] = "FisherJenksSampled"
             geodata.plot(ax=axes[0], legend=False, **kwargs)
-            if ncols == 2:
+            if zoomed_bounds is not None:
                 geodata.plot(ax=axes[1], legend=True, **kwargs)
         finally:
             warnings.simplefilter("default", category=UserWarning)
@@ -360,14 +367,15 @@ def heatmap_figure(
             else:
                 label.set_text(f"{values.lower_formatted} - {values.upper_formatted}")
 
-    if ncols == 2:
+    if zoomed_bounds is not None:
         axes[1].set_xlim(zoomed_bounds.min_x, zoomed_bounds.max_x)
         axes[1].set_ylim(zoomed_bounds.min_y, zoomed_bounds.max_y)
 
-    axes[ncols - 1].annotate(
-        "Source: NorMITs Demand",
-        xy=(0.9, 0.01),
-        xycoords="figure fraction",
-        bbox=dict(boxstyle="square", fc="white"),
-    )
+    if annotation is not None:
+        axes[ncols - 1].annotate(
+            annotation,
+            xy=(0.9, 0.01),
+            xycoords="figure fraction",
+            bbox=dict(boxstyle="square", fc="white"),
+        )
     return fig
