@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 import matplotlib as mpl
 import numpy as np
 from matplotlib import axes, figure, ticker
+from caf.toolkit.cost_utils import CostDistribution
 from pydantic import dataclasses
 from scipy import stats
 
@@ -378,47 +379,46 @@ def plot_xy(
     return fig
 
 def plot_tld(
-    cost_dist,
-    ax=None, 
+    cost_dist: CostDistribution,
+    ax: mpl.axes.Axes | None = None, 
     *,
-    show_weighted_avg=True,
-    title="Trip Length Distribution",
-    xlabel="Trip Length",
-    ylabel=None,
-):
+    show_weighted_avg: bool = True,
+    title: str = "Trip Length Distribution",
+    xlabel: str = "Trip Length",
+    ylabel: str = "Number of Trips",
+) -> mpl.axes.Axes:
     """
     Plot a standard Trip Length Distribution (TLD) from a CostDistribution.
     """
 
-    mins = cost_dist.min_vals
-    maxs = cost_dist.max_vals
-    avgs = cost_dist.avg_vals
-    trips = cost_dist.trip_vals
-
     # Create axis if needed
     if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = mpl.pyplot.subplots(figsize=(8, 5))
+
+    # Set TfN style
+    mpl.pyplot.style.use("caf.viz.tfn")
 
     # Bin widths
-    widths = maxs - mins
+    widths = cost_dist.max_vals - cost_dist.min_vals
 
     # Plot bars
     ax.bar(
-        avgs,
-        values,
+        x=cost_dist.avg_vals,
+        height=cost_dist.trip_vals,
         width=widths,
         align="center",
         edgecolor="black"
     )
 
-    # Weighted average 
+    # Plot the weighted average as a vertical line
     if show_weighted_avg:
-        total_trips = np.sum(trips)
+        total_trips = np.sum(cost_dist.trip_vals)
+
         if total_trips > 0:
-            weighted_avg = np.sum(cost_dist.weighted_avg_vals * trips) / total_trips
+            weighted_avg = np.sum(cost_dist.weighted_avg_vals * cost_dist.trip_vals) / total_trips
 
             ax.axvline(
-                weighted_avg,
+                x=weighted_avg,
                 color="red",
                 linestyle="--",
                 label=f"Weighted Avg: {weighted_avg:.2f}"
@@ -429,6 +429,5 @@ def plot_tld(
     ax.set_title(title)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
-    ax.grid(True, linestyle="--", alpha=0.5)
 
     return ax
