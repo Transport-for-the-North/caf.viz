@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 # Third Party
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import axes, figure, ticker
 from pydantic import dataclasses
@@ -416,7 +417,7 @@ def plot_tld(
     """
     # Create axis if needed
     if ax is None:
-        _fig, ax = mpl.pyplot.subplots(figsize=(8, 5))
+        _fig, ax = plt.subplots(figsize=(8, 5))
 
     # Bin widths
     widths = cost_dist.max_vals - cost_dist.min_vals
