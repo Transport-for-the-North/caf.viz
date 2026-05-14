@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 # Third Party
 import matplotlib as mpl
 import numpy as np
+import pandas as pd  # noqa: TC002
 from matplotlib import axes, figure, ticker
 from pydantic import dataclasses
 from scipy import stats
@@ -22,8 +23,6 @@ from caf.viz import subplots, utils
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-    import pandas as pd
 
 ##### CONSTANTS #####
 
