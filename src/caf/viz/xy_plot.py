@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 # Third Party
 import matplotlib as mpl
 import numpy as np
+import pandas as pd
 from matplotlib import axes, figure, ticker
 from pydantic import dataclasses
 from scipy import stats
@@ -23,7 +24,6 @@ from caf.viz import subplots, utils
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    import pandas as pd
 
 ##### CONSTANTS #####
 
@@ -64,24 +64,6 @@ class CmapData:
             return self.column
         return None
 
-@dataclasses.dataclass(config={"arbitrary_types_allowed": True})
-class BarData:
-    "bar chart data"
-    data: pd.DataFrame
-    value_column: str
-    label_column: str
-    title: str
-    x_label: str
-    y_label: str
-
-    @property
-    def labels(self) -> list[str]:
-        "get bar labels"
-        return list(self.data[self.label_column].values)
-    @property
-    def values(self) -> np.ndarray:
-        "get values for bars"
-        return self.data[self.value_column].values
 
 class XYPlotType(enum.Enum):
     """Types of 2D XY plots."""
@@ -229,7 +211,8 @@ def scatter(
 
         if "c" in kwargs:
             warnings.warn(
-                "`c` parameter cannot be used if `cmap` or `density` is provided", stacklevel=2
+                "`c` parameter cannot be used if `cmap` or `density` is provided",
+                stacklevel=2,
             )
             kwargs.pop("c")
 
@@ -246,15 +229,17 @@ def scatter(
     else:
         fig.colorbar(points, ax=ax, label="Density", ticks=ticker.NullLocator())
 
+
 def bar(
     fig: figure.Figure,
     ax: axes.Axes,
-    data: BarData,
-)-> None:
-    ax.bar(data.labels, data.values)
+    data: BasicData,
+) -> None:
+    ax.bar(data.data[data.x_column], data.data[data.y_column])
     ax.set_xlabel(data.x_label)
     ax.set_ylabel(data.y_label)
     ax.set_title(data.title)
+
 
 def axes_plot_xy(
     fig: figure.Figure,
@@ -308,6 +293,9 @@ def axes_plot_xy(
             cmap=cmap,
             **plot_kwargs,
         )
+
+    elif type_ == XYPlotType.BAR:
+        bar(fig, ax, data)
 
     else:
         raise NotImplementedError(f"unknown plot type {type_}")
