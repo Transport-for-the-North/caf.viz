@@ -1,3 +1,3 @@
-from . import _version
+"""Visualisation functionality and tools for transport related data."""
 
-__version__ = _version.get_versions()["version"]
+from ._version import __version__
