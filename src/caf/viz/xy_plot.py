@@ -12,10 +12,8 @@ from typing import TYPE_CHECKING
 
 # Third Party
 import matplotlib as mpl
-import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import axes, figure, ticker
-from caf.toolkit.cost_utils import CostDistribution
 from pydantic import dataclasses
 from scipy import stats
 
@@ -26,6 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import pandas as pd
+    from caf.toolkit.cost_utils import CostDistribution
 
 ##### CONSTANTS #####
 
@@ -379,9 +378,10 @@ def plot_xy(
 
     return fig
 
+
 def plot_tld(
     cost_dist: CostDistribution,
-    ax: mpl.axes.Axes | None = None, 
+    ax: mpl.axes.Axes | None = None,
     *,
     show_weighted_avg_line: bool = True,
     show_weighted_avg_points: bool = True,
@@ -414,11 +414,9 @@ def plot_tld(
     mpl.axes.Axes
         Axis with the plot.
     """
-
     # Create axis if needed
     if ax is None:
-        fig, ax = mpl.pyplot.subplots(figsize=(8, 5))
-
+        _fig, ax = mpl.pyplot.subplots(figsize=(8, 5))
 
     # Bin widths
     widths = cost_dist.max_vals - cost_dist.min_vals
@@ -429,7 +427,7 @@ def plot_tld(
         height=cost_dist.trip_vals,
         width=widths,
         align="center",
-        edgecolor="black"
+        edgecolor="black",
     )
 
     # Plot the weighted average as a vertical line
@@ -437,13 +435,15 @@ def plot_tld(
         total_trips = np.sum(cost_dist.trip_vals)
 
         if total_trips > 0:
-            weighted_avg = np.sum(cost_dist.weighted_avg_vals * cost_dist.trip_vals) / total_trips
+            weighted_avg = (
+                np.sum(cost_dist.weighted_avg_vals * cost_dist.trip_vals) / total_trips
+            )
 
             ax.axvline(
                 x=weighted_avg,
                 color="red",
                 linestyle="--",
-                label=f"Weighted Avg: {weighted_avg:.2f}"
+                label=f"Weighted Avg: {weighted_avg:.2f}",
             )
             ax.legend()
 
@@ -453,7 +453,7 @@ def plot_tld(
             cost_dist.weighted_avg_vals,
             cost_dist.trip_vals,
             color="orange",
-            label="Weighted Avg Points"
+            label="Weighted Avg Points",
         )
         ax.legend()
 
