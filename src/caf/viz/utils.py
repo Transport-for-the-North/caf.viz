@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Miscellaneous utility functions for visualisation."""
 
 ##### IMPORTS #####
@@ -40,6 +39,6 @@ def style_names() -> list[str]:
     >>> plt.style.use("caf.viz.tfn")
     """
     # MyPy false positive for missing function
-    styles = core.read_style_directory(_PACKAGE_PATH)  # type: ignore
+    styles = core.read_style_directory(_PACKAGE_PATH)  # type: ignore[attr-defined]
 
     return list(styles)

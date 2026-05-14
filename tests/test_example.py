@@ -1,12 +1,7 @@
-# -*- coding: utf-8 -*-
-"""Tests for the caf.viz module"""
-# Built-Ins
+"""Tests for the {} module."""
 
-# Third Party
+# # # IMPORTS # # #
 
-# pylint: disable=import-error,wrong-import-position
-
-# pylint: enable=import-error,wrong-import-position
 
 # # # CONSTANTS # # #
 
@@ -16,8 +11,8 @@
 
 # # # TESTS # # #
 class TestFunctionName:
-    """Placeholder for test class."""
+    """Example test class."""
 
-    def test_something(self):
-        """Placeholder for test function."""
+    def test_something(self) -> None:
+        """Example unit test."""
         assert True
