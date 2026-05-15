@@ -50,6 +50,8 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+# Test statistics 
+junit.xml
 
 # Translations
 *.mo
@@ -130,3 +132,34 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# VS Code
+.vscode/
+
+# Data Files (avoid accidentally uploading data)
+*.csv
+*.xlsx
+
+# Specific CSVs can be included using '!' https://git-scm.com/docs/gitignore#_pattern_format
+# !example.csv
+
+#### GeoSpatial Data
+# ESRI Shapefiles
+*.sh?
+*.prj
+*.dbf
+
+# GeoPackage
+*.gpkg
+*.cpg
+
+# YAML Files
+*.yml
+*.yaml
+
+# Specific configs can be included using '!' https://git-scm.com/docs/gitignore#_pattern_format
+# All configs in the examples folder are included
+!examples/*.yml
+!.github/**/*.yml
+!.readthedocs.yaml
+!.codecov.yml
