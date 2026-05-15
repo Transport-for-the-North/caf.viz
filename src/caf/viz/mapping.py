@@ -1,19 +1,17 @@
-"""WIP Functionality for creating static heatmaps with GeoPandas."""
+"""Static heatmaps for polygon based zone systems with GeoPandas."""
 
 ##### IMPORTS #####
+
 from __future__ import annotations
 
-# Standard imports
 import dataclasses
 import itertools
 import logging
 import math
 import re
 import warnings
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
-# Third party imports
-import geopandas as gpd
 import mapclassify
 import numpy as np
 import pandas as pd
@@ -21,7 +19,9 @@ from matplotlib import cm, patches
 from matplotlib import pyplot as plt
 from shapely import geometry
 
-# Local imports
+if TYPE_CHECKING:
+    import geopandas as gpd
+
 
 ##### CONSTANTS #####
 LOG = logging.getLogger(__name__)
@@ -219,7 +219,7 @@ def _add_poly_boundary(
             ec="red",
             fill=False,
             linewidth=2,
-            label="North Analytical\nArea Boundary" if i == 0 else None,
+            label="Boundary" if i == 0 else None,
             zorder=2,
         )
         if i == 0:
@@ -246,6 +246,43 @@ def heatmap_figure(
     missing_kwds: dict[str, Any] | None = None,
     annotation: str | None = None,
 ) -> plt.Figure:
+    """Create a heatmap with GeoSpatial Polygon data.
+
+    Parameters
+    ----------
+    geodata
+        GeoSpatial data to be plotted, designed for use with Polygon
+        geometries but other geometry types should work.
+    column_name
+        Name of column used to determine heatmap colours.
+    title
+        Figure title.
+    bins
+        Optional bin edges to use for colouring, if not provided
+        bin edges will be generated based on `n_bins`.
+    n_bins
+        Number of bins to generate (default 5), ignored if `bins` is provided.
+    polygon_boundary
+        Polygon to overlay on heatmap.
+    positive_negative_colormaps
+        If True colour use separate colour maps for positive and negative values.
+    legend_label_fmt
+        Number format for legend, default "{:.1%}".
+    legend_title
+        Optional legend title, `column_name` is used if not given.
+    zoomed_bounds
+        Optional bounding box to zoom to in a sub-plot.
+    missing_kwds
+        Keyword arguments for styling any NaN values.
+    annotation
+        Optional annotation to add to the bottom of the figure.
+
+    Returns
+    -------
+    plt.Figure
+        Figure with heatmap plotted, with 2 Axes if `zoomed_bounds`
+        is given.
+    """
     legend_kwargs = dict(title_fontsize="large", fontsize="medium")
 
     ncols = 1 if zoomed_bounds is None else 2
@@ -340,12 +377,12 @@ def heatmap_figure(
         # If the quatiles scheme throws a warning then use FisherJenksSampled
         warnings.simplefilter("error", category=UserWarning)
         try:
-            geodata.plot(ax=axes[0], legend=False, **kwargs)
+            geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
             if zoomed_bounds is not None:
                 geodata.plot(ax=axes[1], legend=True, **kwargs)
         except UserWarning:
             kwargs["scheme"] = "FisherJenksSampled"
-            geodata.plot(ax=axes[0], legend=False, **kwargs)
+            geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
             if zoomed_bounds is not None:
                 geodata.plot(ax=axes[1], legend=True, **kwargs)
         finally:
