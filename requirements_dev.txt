@@ -2,7 +2,7 @@
 ruff>=0.12
 pylint>=3.3.1
 mypy>=1.0.0
-mypy_extensions>=1.0.0
+mypy_extensions>=1.1.0
 
 # Testing
 pytest>=8.3
