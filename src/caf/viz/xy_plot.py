@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import pandas as pd
-    from caf.toolkit.cost_utils import CostDistribution
+    from caf.toolkit import cost_utils
 
 ##### CONSTANTS #####
 
@@ -381,7 +381,7 @@ def plot_xy(
 
 
 def plot_tld(
-    cost_dist: CostDistribution,
+    cost_dist: cost_utils.CostDistribution,
     ax: mpl.axes.Axes | None = None,
     *,
     show_weighted_avg_line: bool = True,
@@ -395,7 +395,7 @@ def plot_tld(
 
     Parameters
     ----------
-    cost_dist : CostDistribution
+    cost_dist : cost_utils.CostDistribution
         CostDistribution containing the data to plot.
     ax : mpl.axes.Axes, optional
         Axis to plot on. If None, a new figure and axis will be created.
@@ -442,7 +442,7 @@ def plot_tld(
 
             ax.axvline(
                 x=weighted_avg,
-                color="red",
+                color="C1",
                 linestyle="--",
                 label=f"Weighted Avg: {weighted_avg:.2f}",
             )
@@ -453,8 +453,8 @@ def plot_tld(
         ax.scatter(
             cost_dist.weighted_avg_vals,
             cost_dist.trip_vals,
-            color="orange",
-            label="Weighted Avg Points",
+            color="C2",
+            label=f"Weighted Avg. {xlabel}",
         )
         ax.legend()
 

@@ -3,7 +3,7 @@ Trip Length Distribution Plot
 =====================================
 
 This example demonstrates how to create a Trip Length Distribution (TLD) plot using the
-`plot_tld` function from the `caf.viz.xy_plot` module.
+:func:`~caf.viz.xy_plot.plot_tld` function from the :mod:`caf.viz.xy_plot` module.
 """
 
 # %%
@@ -11,9 +11,11 @@ This example demonstrates how to create a Trip Length Distribution (TLD) plot us
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from caf.toolkit.cost_utils import CostDistribution
+from caf.toolkit import cost_utils
 
 from caf.viz.xy_plot import plot_tld
+
+plt.style.use("caf.viz.tfn")
 
 # %%
 # First, simulate some trip length data to generate a realistic trip length distribution
@@ -43,10 +45,11 @@ cost_dist = pd.DataFrame(
         "weighted_avg": weighted_avgs,
     }
 )
-cd = CostDistribution(cost_dist, weighted_avg_col="weighted_avg")
+cd = cost_utils.CostDistribution(cost_dist, weighted_avg_col="weighted_avg")
 
 
-# %% Finally, generate the TLD plot.
+# %%
+# Finally, generate the TLD plot.
 ax = plot_tld(
     cd,
     title="Example Trip Length Distribution",

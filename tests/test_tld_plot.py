@@ -5,7 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from caf.toolkit.cost_utils import CostDistribution
+from caf.toolkit import cost_utils
 
 from caf.viz.xy_plot import plot_tld
 
@@ -17,7 +17,7 @@ def get_output_path(filename: str) -> Path:
     return output_dir / filename
 
 
-def make_cd() -> CostDistribution:
+def make_cd() -> cost_utils.CostDistribution:
     """Create a simple CostDistribution object for testing."""
     cost_dist = pd.DataFrame(
         {
@@ -27,10 +27,10 @@ def make_cd() -> CostDistribution:
             "trips": [100, 200, 150, 50],
         }
     )
-    return CostDistribution(cost_dist)
+    return cost_utils.CostDistribution(cost_dist)
 
 
-def make_skewed_cd() -> CostDistribution:
+def make_skewed_cd() -> cost_utils.CostDistribution:
     """Create a skewed CostDistribution object for testing."""
     cost_dist = pd.DataFrame(
         {
@@ -41,7 +41,7 @@ def make_skewed_cd() -> CostDistribution:
             "weighted_avg": [4.0, 9.0, 14.0, 19.0],
         }
     )
-    return CostDistribution(cost_dist, weighted_avg_col="weighted_avg")
+    return cost_utils.CostDistribution(cost_dist, weighted_avg_col="weighted_avg")
 
 
 def test_plot_tld() -> None:
@@ -77,7 +77,7 @@ def test_uneven_bins() -> None:
             "trips": [100, 200, 50],
         }
     )
-    cd = CostDistribution(cost_dist)
+    cd = cost_utils.CostDistribution(cost_dist)
 
     ax = plot_tld(cd)
     ax.figure.savefig(
@@ -89,7 +89,7 @@ def test_uneven_bins() -> None:
 def test_single_bin() -> None:
     """Test the plot_tld function with a single bin."""
     cost_dist = pd.DataFrame({"min": [0], "max": [10], "avg": [5], "trips": [100]})
-    cd = CostDistribution(cost_dist)
+    cd = cost_utils.CostDistribution(cost_dist)
 
     ax = plot_tld(cd)
     ax.figure.savefig(
@@ -121,7 +121,7 @@ def test_no_weighted_avg_vals() -> None:
             "trips": [100, 200, 150],
         }
     )
-    cd = CostDistribution(cost_dist, weighted_avg_col=None)
+    cd = cost_utils.CostDistribution(cost_dist, weighted_avg_col=None)
 
     ax = plot_tld(cd)
     ax.figure.savefig(
@@ -141,7 +141,7 @@ def test_many_bins() -> None:
             "trips": np.random.randint(0, 100, size=n),
         }
     )
-    cd = CostDistribution(cost_dist)
+    cd = cost_utils.CostDistribution(cost_dist)
 
     ax = plot_tld(cd)
     ax.figure.savefig(
