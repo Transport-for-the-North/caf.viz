@@ -1,67 +1,104 @@
 """
-HTML mapping example
-=======
+Example
+===========
 
 This is a code example which is displayed but **not** run.
 
 """
 
 # %%
+# IMPORTS #
+import pathlib
+
 import geopandas as gpd
 from geodatasets import get_path
 
+from caf.viz.web import mapping
+
+# %%
+# DATA #
 path_to_data = get_path("eurostat.nuts_rg_10m_2024_3035")
 europe = gpd.read_file(path_to_data)
+
 path_to_data = get_path("naturalearth.cities")
 cities = gpd.read_file(path_to_data)
 
+europe_countries = europe[europe["LEVL_CODE"] == 0]
+
+# %%
+europe_countries
 
 # %%
 cities
 
 # %%
-europe
 
-# %%
-from caf.viz.web import mapping
+# PREPARE DATA #
+datasets = {"Countries": europe_countries, "Cities": cities}
 
-## Prepare data for mapping ##
-datasets = {
-    "Cities": cities
-}
+color_column = {"Countries": None, "Cities": "natscale"}
 
-color_column = {
-    "Cities": "natscale"
-}
+tooltip = {"Countries": ["NUTS_NAME", "NAME_ENGL", "CAPT"], "Cities": ["name", "natscale"]}
 
-tooltip = {
-    "Cities": ["name", "natscale"]
+options = {
+    "Countries": mapping.ExploreOptions(
+        tooltip=tooltip["Countries"],
+        show_legend=False,
+        style={"fillOpacity": 0.4, "fillColor": "grey", "color": "black"},
+    ),
+    "Cities": mapping.ExploreOptions(tooltip=tooltip["Cities"], show_legend=True),
 }
 
 mapping_datasets = {}
 for name, data in datasets.items():
     mapping_datasets[name] = mapping.MapData(
-        data=data,
+        data=data.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}"),
         color_column=color_column[name],
-        options=mapping.ExploreOptions(
-            tooltip=tooltip[name],
-            show_legend=True
-        )
+        options=options[name],
     )
 
-# %%
-if europe.crs != mapping.MAP_CRS_EPSG:
-    filter_zones = europe.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")[["NAME_ENGL", "geometry"]]
+# Prepare mask
+if europe_countries.crs != mapping.MAP_CRS_EPSG:
+    filter_zones = europe_countries.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")
 else:
-    filter_zones = europe[["NAME_ENGL", "geometry"]]
-filter_polygon = filter_zones.dissolve(by="NAME_ENGL")
+    filter_zones = europe_countries
 
-m = mapping.map_datasets(
-    datasets=mapping_datasets,
-    mask=filter_polygon.geometry,
-    mask_name="NAME_ENGL"
-)
+# %%
+# CREATE MAP (single map) #
+m = mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
 
+
+# %%
 m
 
+
+# %%
+# SAVE MAP (OPTIONAL) #
 m.save("path/to/save/map.html")
+
+# %%
+# CREATE MAP (split map) #
+europe_regions = europe[europe["LEVL_CODE"] == 3]
+
+mapping_datasets = {
+    "Regions": mapping.MapData(
+        data=europe_regions.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}"),
+        color_column="NAME_ENGL",
+        options=mapping.ExploreOptions(
+            tooltip=["NUTS_NAME", "NAME_ENGL", "CAPT"],
+            show_legend=True,
+            style={"fillOpacity": 0.4, "fillColor": "grey", "color": "black"},
+        ),
+    )
+}
+
+# Check map crs
+if europe_countries.crs != mapping.MAP_CRS_EPSG:
+    europe_countries = europe_countries.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")
+
+split_m = mapping.produce_map_set(
+    output_path=pathlib.Path(r"path/to/save/split_map.html"),
+    datasets=mapping_datasets,
+    split=europe_countries,
+    split_name_column="NAME_ENGL",
+)
