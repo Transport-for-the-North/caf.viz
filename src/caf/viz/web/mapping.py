@@ -12,6 +12,7 @@ import geopandas as gpd
 import tqdm
 from branca.element import Element, MacroElement, Template
 from shapely import geometry
+import re
 
 ##### CONSTANTS #####
 
@@ -92,6 +93,7 @@ HEAD = """
 
 ##### CLASSES & FUNCTIONS #####
 
+
 class Bounds(NamedTuple):
     """Bounding box coordinates."""
 
@@ -112,6 +114,7 @@ class Bounds(NamedTuple):
             max_y=max(self.max_y, value.max_y),
         )
 
+
 @dataclasses.dataclass
 class ExploreOptions:
     """Options for MapData."""
@@ -123,6 +126,8 @@ class ExploreOptions:
     highlight_style: dict = dataclasses.field(default_factory=dict)
     legend_title: str | None = None
     cmap: str | list[str] = "viridis"
+    show: bool = True
+
 
 @dataclasses.dataclass()
 class MapData:
@@ -132,6 +137,15 @@ class MapData:
     color_column: str | None = None
     to_filter: bool = True
     options: ExploreOptions = dataclasses.field(default_factory=lambda: ExploreOptions())  # noqa: PLW0108 # pylint: disable=W0108
+
+
+def _clean_filename(name: str, replacement: str = "_") -> str:
+    # replace characters not allowed in filenames
+    cleaned = re.sub(r'[<>:"\'.,/\\|?*]', replacement, name)
+    # collapse repeated underscores/spaces, trim edges
+    cleaned = re.sub(r"[_\s]+", "_", cleaned).strip("_")
+    return cleaned[:255]  # keep it under common filesystem limits
+
 
 def _explore(
     map_: folium.Map,
@@ -148,10 +162,10 @@ def _explore(
     else:
         legend = {}
 
-
     data.explore(
         data_column,
-        categorical=data_column is not None,  # AM: True if there is a data_column, see if this is good enough
+        categorical=data_column
+        is not None,  # AM: True if there is a data_column, see if this is good enough
         cmap=options.cmap,
         legend=options.show_legend,
         m=map_,
@@ -159,16 +173,37 @@ def _explore(
         popup=options.popup,
         tiles=None,
         name=name,
-        show=True,
+        show=options.show,
         legend_kwds=legend,
         popup_kwds={"labels": False},
         style_kwds=options.style,
         highlight_kwds=options.highlight_style,
     )
 
+
+def check_output_path(output_path: pathlib.Path) -> pathlib.Path:
+    """Check that the output path is valid and adjust if necessary."""
+    if output_path.is_dir():
+        output_path = output_path / "Map.html"
+    elif output_path.suffix.lower() != ".html":
+        output_path = output_path.with_suffix(".html")
+    return output_path
+
+
+def check_mask(mask: gpd.GeoDataFrame | gpd.GeoSeries) -> geometry.Polygon:
+    """Check that the mask is a single polygon and of the right CRS."""
+    if mask.crs != f"EPSG:{MAP_CRS_EPSG}":
+        mask = mask.to_crs(f"EPSG:{MAP_CRS_EPSG}")
+    return mask.union_all()
+
+
 def map_datasets(
     datasets: Mapping[str, MapData],
-    mask: geometry.Polygon | None = None,
+    mask: geometry.Polygon
+    | geometry.MultiPolygon
+    | gpd.GeoDataFrame
+    | gpd.GeoSeries
+    | None = None,
     mask_name: str | None = None,
     textbox_text: str = TEXT_NOSPLIT,
     output_path: pathlib.Path | None = None,
@@ -183,9 +218,10 @@ def map_datasets(
     datasets : Mapping[str, MapData]
         Datasets must be provided as a dictionary of name to MapData.
         MapData includes the GeoDataFrame, an optional color column to plot, and extra options for plotting (ExploreOptions).
-    mask : geometry.Polygon | None, optional
+    mask : geometry.Polygon | geometry.MultiPolygon | gpd.GeoDataFrame | gpd.GeoSeries  | None, optional
         Mask to be used to filter data for mapping.
-        Must be a single geometry object (Polygon).
+        Must be a single geometry object (Polygon or MultiPolygon) of the correct CRS (EPSG:4326).
+        If it is a GeoDataFrame/GeoSeries, it will be unioned to create the mask geometry and CRS will be adjusted if necessary.
         By default None.
     mask_name : str | None, optional
         Name of the mask (filtering) layer.
@@ -193,7 +229,7 @@ def map_datasets(
     textbox_text : str, optional
         Text to go into the foldable textbox in bottom left of map.
         By default TEXT_NOSPLIT.
-    output_path : pathlib.Path | None
+    output_path : pathlib.Path | None, optional
         Output path to write the HTML map.
         If a directory is provided, the map will be written to a file called "Map.html" in that directory.
         If None, the map object will be returned instead.
@@ -203,11 +239,12 @@ def map_datasets(
     pathlib.Path | folium.Map
         Output path of the created HTML map or the map object itself.
     """
+    # Check output path and mask
     if output_path is not None:
-        if output_path.is_dir():
-            output_path = output_path / "Map.html"
-        elif output_path.suffix.lower() != ".html":
-            output_path = output_path.with_suffix(".html")
+        output_path = check_output_path(output_path)
+    if mask is not None and not isinstance(mask, (geometry.Polygon, geometry.MultiPolygon)):
+        mask = check_mask(mask)
+
     map_ = folium.Map(tiles="OpenStreetMap", prefer_canvas=True)
 
     if mask is not None:
@@ -218,12 +255,14 @@ def map_datasets(
             style_function=lambda _: {"color": "black", "fill": True, "fillOpacity": "0.2"},
         ).add_to(map_)
 
+    # accumulate bounds for all datasets so fit_bounds targets the whole dataset set
+    accumulated_bounds: Bounds | None = None
     for name, details in datasets.items():
         data = details.data.copy()
         if data.crs != MAP_CRS_EPSG:
             data = data.to_crs(MAP_CRS_EPSG)
         if mask is not None and details.to_filter:
-            data = _filter_data(data, mask.union_all(), name, mask_name)
+            data = _filter_data(data, mask, name, mask_name)
 
             if len(data) == 0:
                 warnings.warn(
@@ -234,9 +273,13 @@ def map_datasets(
                 )
                 continue
 
-        _explore(
-            map_, data, details.color_column, name, options=details.options
+        # update accumulated bounds with this dataset's bounds
+        data_bounds = Bounds(*data.union_all().bounds)
+        accumulated_bounds = (
+            data_bounds if accumulated_bounds is None else accumulated_bounds + data_bounds
         )
+
+        _explore(map_, data, details.color_column, name, options=details.options)
         LOG.debug("Created %s layer with %s features", name, f"{len(data):,}")
 
     # Add CSS (on Header)
@@ -262,7 +305,11 @@ def map_datasets(
     map_.get_root().html.add_child(body)  # type: ignore[attr-defined]
 
     folium.LayerControl(collapsed=False).add_to(map_)
-    bounds = Bounds(*mask.bounds) if mask is not None else Bounds(*data.union_all().bounds)
+    # Use mask bounds if provided, otherwise bounds accumulated across datasets
+    if mask is not None:
+        bounds = Bounds(*mask.bounds)
+    else:
+        bounds = accumulated_bounds
     map_.fit_bounds([[bounds.min_y, bounds.min_x], [bounds.max_y, bounds.max_x]])
 
     if output_path is None:
@@ -271,13 +318,14 @@ def map_datasets(
     LOG.debug("Written %s", output_path)
     return output_path
 
+
 def _filter_data(
     data: gpd.GeoDataFrame,
-    filter_: geometry.Polygon | None,
+    filter_: geometry.Polygon,
     name: str,
-    filter_name: str | None,
+    filter_name: str,
 ) -> gpd.GeoDataFrame:
-    """Filter data on filter polygon."""
+    """Filter data on a polygon mask."""
     before = len(data)
     if before != 0:
         data = data.loc[data.intersects(filter_)]
@@ -297,13 +345,24 @@ def _load_map_split(
     filter_zone: gpd.GeoDataFrame | None = None,
 ) -> gpd.GeoSeries:
     """Split html maps to given split geometries, filtered on a specific area if given."""
+    if split.crs != f"EPSG:{MAP_CRS_EPSG}":
+        split = split.to_crs(f"EPSG:{MAP_CRS_EPSG}")
     if filter_zone is not None:
+        filter_zone = check_mask(filter_zone)
         split["centroid"] = split.geometry.centroid
-        if split.crs != filter_zone.crs:
-            filter_zone = filter_zone.to_crs(split.crs)
-        filter_zone_union = filter_zone.union_all()
         # filter the split zones to centroids to avoid including neighbouring zones
-        split = split[split["centroid"].within(filter_zone_union)][[split_name_column, split.geometry.name]]
+        split = split[split["centroid"].within(filter_zone)]
+
+    if split_name_column not in split.columns:
+        if split.index.name == split_name_column:
+            split = split.reset_index()
+        else:
+            raise KeyError(
+                f"split_name_column '{split_name_column}' not found in split columns {list(split.columns)}"
+                f"or index name '{split.index.name}'"
+            )
+
+    split = split[[split_name_column, split.geometry.name]]
     data = split.to_crs(MAP_CRS_EPSG)
     series = data.set_index(split_name_column).squeeze()
 
@@ -313,11 +372,11 @@ def _load_map_split(
 
 
 def produce_map_set(
+    output_path: pathlib.Path,
     datasets: dict[str, MapData],
     split: gpd.GeoDataFrame,
     split_name_column: str,
-    filter_zone_gpd: gpd.GeoDataFrame | None,
-    output_path: pathlib.Path,
+    filter_zone_gpd: gpd.GeoDataFrame | None = None,
 ) -> None:
     """Produce HTML maps for datasets, split into regions.
 
@@ -327,6 +386,9 @@ def produce_map_set(
 
     Parameters
     ----------
+    output_path : pathlib.Path
+        Output path to write the HTML map.
+        If a directory is provided, the overview map will be written to a file called "Overview Map.html" in that directory.
     datasets : dict[str, MapData]
         Datasets must be provided as a dictionary of name to MapData.
         MapData includes the GeoDataFrame, an optional color column to plot, and extra options for plotting (ExploreOptions).
@@ -334,19 +396,17 @@ def produce_map_set(
         GeoDataFrame containing the geometries to split the map into.
     split_name_column : str
         Name of the column containing the names of the split geometries.
-    filter_zone_gpd : gpd.GeoDataFrame | None
-        GeoDataFrame containing the geometry to filter the split geometries.
-    output_path : pathlib.Path
-        Output path to write the HTML map.
-        If a directory is provided, the overview map will be written to a file called "Overview Map.html" in that directory.
+    filter_zone_gpd : gpd.GeoDataFrame | None, optional
+        GeoDataFrame or GeoSeries containing the geometry to filter the split geometries.
     """
     if output_path.is_dir():
         output_path = output_path / "Overview Map.html"
 
     split_folder = pathlib.Path(output_path.parent, "Split Maps")
     split_folder.mkdir(exist_ok=True)
+    split["clean_map_name"] = split[split_name_column].map(_clean_filename)
     split_geom = _load_map_split(
-        split=split, split_name_column=split_name_column, filter_zone=filter_zone_gpd
+        split=split, split_name_column="clean_map_name", filter_zone=filter_zone_gpd
     )
 
     # Make overview map with links to split maps
@@ -355,13 +415,17 @@ def produce_map_set(
         '<a href="'
         + split_folder.name
         + "/"
-        + overview_data[split_name_column]
+        + overview_data["clean_map_name"]
         + '.html">'
-        + overview_data[split_name_column]
+        + overview_data["clean_map_name"]
         + "</a>"
     )
     overview_data["popup_text_submap"] = (
-        '<a href="' + overview_data[split_name_column] + '.html">' + overview_data[split_name_column] + "</a>"
+        '<a href="'
+        + overview_data["clean_map_name"]
+        + '.html">'
+        + overview_data["clean_map_name"]
+        + "</a>"
     )
 
     overview_geom = {
@@ -370,13 +434,13 @@ def produce_map_set(
             color_column=None,
             to_filter=False,
             options=ExploreOptions(
-                tooltip=[split_name_column],
+                tooltip=["clean_map_name"],
                 popup="popup_text",
                 style={"fillOpacity": 0.4, "fillColor": "grey", "color": "black"},
             ),
         )
     }
-    map_datasets(overview_geom, output_path, textbox_text=TEXT_SPLIT)
+    map_datasets(overview_geom, textbox_text=TEXT_SPLIT, output_path=output_path)
 
     datasets = {
         "Subset Areas": MapData(
@@ -384,7 +448,7 @@ def produce_map_set(
             color_column=None,
             to_filter=False,
             options=ExploreOptions(
-                tooltip=[split_name_column],
+                tooltip=["clean_map_name"],
                 popup="popup_text_submap",
                 style={"fillOpacity": 0.1, "color": "black", "fillColor": "grey"},
                 highlight_style={"fillOpacity": 0.5},
@@ -399,9 +463,9 @@ def produce_map_set(
     ):
         map_datasets(
             datasets,
-            split_folder / f"{map_name}.html",
             mask=geom,
             mask_name=map_name,
             textbox_text=TEXT_SPLIT,
+            output_path=split_folder / f"{map_name}.html",
         )
     LOG.info("Written %s maps to %s", len(split_geom), split_folder)
