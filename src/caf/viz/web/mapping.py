@@ -1,18 +1,18 @@
 """Functionality for creating html maps from spatial datasets."""
 
-import logging
 import dataclasses
+import logging
 import pathlib
+import re
 import warnings
 from collections.abc import Mapping
-from typing import Literal, NamedTuple, Self
+from typing import NamedTuple, Self
 
 import folium
 import geopandas as gpd
 import tqdm
 from branca.element import Element, MacroElement, Template
 from shapely import geometry
-import re
 
 ##### CONSTANTS #####
 
@@ -102,7 +102,7 @@ class Bounds(NamedTuple):
     max_x: int | float
     max_y: int | float
 
-    def __add__(self, value) -> Self:
+    def __add__(self, value: Self) -> Self:
         """Create a bounding box which contain both."""
         if not isinstance(value, self.__class__):
             raise TypeError(f"value should be {self.__class__} not {type(value)}")
@@ -211,17 +211,22 @@ def map_datasets(
     """Produce single HTML map including all datasets.
 
     A single interactive map will be produced, filtered to the mask if provided.
-    A textbox is included with instructions on how to use the map, which can be customised with the textbox_text parameter.
+    A textbox is included with instructions on how to use the map, which can be customised with
+    the textbox_text parameter.
 
     Parameters
     ----------
     datasets : Mapping[str, MapData]
         Datasets must be provided as a dictionary of name to MapData.
-        MapData includes the GeoDataFrame, an optional color column to plot, and extra options for plotting (ExploreOptions).
-    mask : geometry.Polygon | geometry.MultiPolygon | gpd.GeoDataFrame | gpd.GeoSeries  | None, optional
+        MapData includes the GeoDataFrame, an optional color column to plot, and extra options
+         for plotting (ExploreOptions).
+    mask : geometry.Polygon | geometry.MultiPolygon | gpd.GeoDataFrame | gpd.GeoSeries  | None,
+      optional
         Mask to be used to filter data for mapping.
-        Must be a single geometry object (Polygon or MultiPolygon) of the correct CRS (EPSG:4326).
-        If it is a GeoDataFrame/GeoSeries, it will be unioned to create the mask geometry and CRS will be adjusted if necessary.
+        Must be a single geometry object (Polygon or MultiPolygon) of the correct CRS
+          (EPSG:4326).
+        If it is a GeoDataFrame/GeoSeries, it will be unioned to create the mask geometry and
+          CRS will be adjusted if necessary.
         By default None.
     mask_name : str | None, optional
         Name of the mask (filtering) layer.
@@ -231,7 +236,8 @@ def map_datasets(
         By default TEXT_NOSPLIT.
     output_path : pathlib.Path | None, optional
         Output path to write the HTML map.
-        If a directory is provided, the map will be written to a file called "Map.html" in that directory.
+        If a directory is provided, the map will be written to a file called "Map.html" in
+          that directory.
         If None, the map object will be returned instead.
 
     Returns
@@ -323,7 +329,7 @@ def _filter_data(
     data: gpd.GeoDataFrame,
     filter_: geometry.Polygon,
     name: str,
-    filter_name: str,
+    filter_name: str | None,
 ) -> gpd.GeoDataFrame:
     """Filter data on a polygon mask."""
     before = len(data)
@@ -358,7 +364,8 @@ def _load_map_split(
             split = split.reset_index()
         else:
             raise KeyError(
-                f"split_name_column '{split_name_column}' not found in split columns {list(split.columns)}"
+                f"split_name_column '{split_name_column}' not found in split columns "
+                f"{list(split.columns)} "
                 f"or index name '{split.index.name}'"
             )
 
@@ -380,18 +387,22 @@ def produce_map_set(
 ) -> None:
     """Produce HTML maps for datasets, split into regions.
 
-    A set of maps will be produced, one for each geometry in the split GeoDataFrame, filtered to the filter_zone_gpd if provided.
-    The initial overview map will include links to the split maps, which will be stored in a separate folder.
+    A set of maps will be produced, one for each geometry in the split GeoDataFrame, filtered
+     to the filter_zone_gpd if provided.
+    The initial overview map will include links to the split maps, which will be stored in a
+      separate folder.
     A textbox is included with instructions on how to use the map.
 
     Parameters
     ----------
     output_path : pathlib.Path
         Output path to write the HTML map.
-        If a directory is provided, the overview map will be written to a file called "Overview Map.html" in that directory.
+        If a directory is provided, the overview map will be written to a file called
+         "Overview Map.html" in that directory.
     datasets : dict[str, MapData]
         Datasets must be provided as a dictionary of name to MapData.
-        MapData includes the GeoDataFrame, an optional color column to plot, and extra options for plotting (ExploreOptions).
+        MapData includes the GeoDataFrame, an optional color column to plot, and extra options
+         for plotting (ExploreOptions).
     split : gpd.GeoDataFrame
         GeoDataFrame containing the geometries to split the map into.
     split_name_column : str
