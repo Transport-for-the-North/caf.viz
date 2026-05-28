@@ -20,6 +20,10 @@ from caf.viz.web import mapping
 COUNTRY_CODE = 0
 REGION_CODE = 3
 
+# PATHS
+PATH_TO_SAVE_MAP = pathlib.Path(r"path/to/save/map.html")
+PATH_TO_SAVE_SPLIT_MAP = pathlib.Path(r"path/to/save/split_map.html")
+
 # %%
 # DATA #
 path_to_data = get_path("eurostat.nuts_rg_10m_2024_3035")
@@ -68,7 +72,7 @@ m = mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name
 
 # %%
 # SAVE MAP (OPTIONAL) #
-m.save("path/to/save/map.html")
+m.save(PATH_TO_SAVE_MAP)
 
 # %%
 # CREATE MAP (split map) #
@@ -91,7 +95,7 @@ if europe_countries.crs != mapping.MAP_CRS_EPSG:
     europe_countries = europe_countries.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")
 
 split_m = mapping.produce_map_set(
-    output_path=pathlib.Path(r"path/to/save/split_map.html"),
+    output_path=PATH_TO_SAVE_SPLIT_MAP,
     datasets=mapping_datasets,
     split=europe_countries,
     split_name_column="NAME_ENGL",
