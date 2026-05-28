@@ -102,7 +102,7 @@ class Bounds(NamedTuple):
     max_x: int | float
     max_y: int | float
 
-    def __add__(self, value: Self) -> Self:
+    def __add__(self, value: object) -> Self:
         """Create a bounding box which contain both."""
         if not isinstance(value, self.__class__):
             raise TypeError(f"value should be {self.__class__} not {type(value)}")
@@ -261,8 +261,6 @@ def map_datasets(
             style_function=lambda _: {"color": "black", "fill": True, "fillOpacity": "0.2"},
         ).add_to(map_)
 
-    # accumulate bounds for all datasets so fit_bounds targets the whole dataset set
-    accumulated_bounds: Bounds | None = None
     for name, details in datasets.items():
         data = details.data.copy()
         if data.crs != MAP_CRS_EPSG:
@@ -278,12 +276,6 @@ def map_datasets(
                     stacklevel=2,
                 )
                 continue
-
-        # update accumulated bounds with this dataset's bounds
-        data_bounds = Bounds(*data.union_all().bounds)
-        accumulated_bounds = (
-            data_bounds if accumulated_bounds is None else accumulated_bounds + data_bounds
-        )
 
         _explore(map_, data, details.color_column, name, options=details.options)
         LOG.debug("Created %s layer with %s features", name, f"{len(data):,}")
@@ -311,11 +303,9 @@ def map_datasets(
     map_.get_root().html.add_child(body)  # type: ignore[attr-defined]
 
     folium.LayerControl(collapsed=False).add_to(map_)
-    # Use mask bounds if provided, otherwise bounds accumulated across datasets
-    if mask is not None:
-        bounds = Bounds(*mask.bounds)
-    else:
-        bounds = accumulated_bounds
+
+    # Fit map to bounds of mask or last dataset
+    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.union_all().bounds)
     map_.fit_bounds([[bounds.min_y, bounds.min_x], [bounds.max_y, bounds.max_x]])
 
     if output_path is None:
