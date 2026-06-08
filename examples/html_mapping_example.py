@@ -21,8 +21,8 @@ COUNTRY_CODE = 0
 REGION_CODE = 3
 
 # PATHS
-PATH_TO_SAVE_MAP = pathlib.Path(r"path/to/save/map.html")
-PATH_TO_SAVE_SPLIT_MAP = pathlib.Path(r"path/to/save/split_map.html")
+PATH_TO_SAVE_MAP = pathlib.Path(r"map.html")
+PATH_TO_SAVE_SPLIT_MAP = pathlib.Path(r"split_map.html")
 
 # %%
 # DATA #
