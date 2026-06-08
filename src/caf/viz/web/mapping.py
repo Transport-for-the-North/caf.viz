@@ -164,8 +164,7 @@ def _explore(
 
     data.explore(
         data_column,
-        categorical=data_column
-        is not None,  # AM: True if there is a data_column, see if this is good enough
+        categorical=data_column is not None,
         cmap=options.cmap,
         legend=options.show_legend,
         m=map_,
@@ -340,7 +339,7 @@ def _load_map_split(
     split_name_column: str,
     filter_zone: gpd.GeoDataFrame | None = None,
 ) -> gpd.GeoSeries:
-    """Split html maps to given split geometries, filtered on a specific area if given."""
+    """Load split geometries to split the maps on, filtered on a specific area if given."""
     if split.crs != f"EPSG:{MAP_CRS_EPSG}":
         split = split.to_crs(f"EPSG:{MAP_CRS_EPSG}")
     if filter_zone is not None:
