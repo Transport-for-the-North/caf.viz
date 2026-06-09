@@ -14,7 +14,7 @@ The example uses the NUTS dataset from Eurostat and the cities dataset from Natu
 
 # %%
 # IMPORTS
-# --------
+# ----------------
 import pathlib
 
 import geopandas as gpd
@@ -24,7 +24,7 @@ from caf.viz.web import mapping
 
 # %%
 # CONSTANTS
-# --------
+# ----------------
 COUNTRY_CODE = 0
 REGION_CODE = 3
 
@@ -34,7 +34,7 @@ PATH_TO_SAVE_SPLIT_MAP = pathlib.Path(r"split_map.html")
 
 # %%
 # DATA
-# --------
+# ----------------
 path_to_data = get_path("eurostat.nuts_rg_10m_2024_3035")
 europe = gpd.read_file(path_to_data)
 
@@ -45,7 +45,7 @@ europe_countries = europe[europe["LEVL_CODE"] == COUNTRY_CODE]
 
 # %%
 # PREPARE DATA
-# --------
+# ----------------
 datasets = {"Countries": europe_countries, "Cities": cities}
 
 color_column = {"Countries": None, "Cities": "natscale"}
@@ -77,7 +77,7 @@ else:
 
 # %%
 # CREATE MAP (single map)
-# --------
+# ------------------------
 m = mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
 
 # %%
@@ -85,12 +85,12 @@ m  # noqa: B018
 
 # %%
 # SAVE MAP (OPTIONAL)
-# --------
+# ------------------------
 m.save(PATH_TO_SAVE_MAP)
 
 # %%
 # CREATE MAP (split map)
-# --------
+# ------------------------
 europe_regions = europe[europe["LEVL_CODE"] == REGION_CODE]
 
 mapping_datasets = {
