@@ -3,10 +3,12 @@ HTML mapping example
 ===========
 
 This is a code example showing how to create an interactive map using the web/mapping module.
-This example shows two ways to create an interactive html map: A single map with the desired datasets,
-and a split map consisting of an overview map with the split geometries which link to individual maps showing the datasets for each split geometry.
+This example shows two ways to create an interactive html map:
+A single map with the desired datasets,and a split map consisting of an overview map with the
+ split geometries which link to individual maps showing the datasets for each split geometry.
 
-The example uses the NUTS dataset from Eurostat and the cities dataset from Natural Earth, both of which are available in geodatasets.
+The example uses the NUTS dataset from Eurostat and the cities dataset from Natural Earth,
+ both of which are available in geodatasets.
 
 """
 
@@ -79,7 +81,7 @@ else:
 m = mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
 
 # %%
-m
+m  # noqa: B018
 
 # %%
 # SAVE MAP (OPTIONAL)
