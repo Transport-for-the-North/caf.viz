@@ -2,9 +2,9 @@
 HTML mapping example
 ===========
 
-This is a code example showing how to create an interactive map using the web/mapping module. 
-This example shows two ways to create an interactive html map: A single map with the desired datasets, 
-and a split map consisting of an overview map with the split geometries which link to individual maps showing the datasets for each split geometry. 
+This is a code example showing how to create an interactive map using the web/mapping module.
+This example shows two ways to create an interactive html map: A single map with the desired datasets,
+and a split map consisting of an overview map with the split geometries which link to individual maps showing the datasets for each split geometry.
 
 The example uses the NUTS dataset from Eurostat and the cities dataset from Natural Earth, both of which are available in geodatasets.
 
@@ -21,7 +21,7 @@ from geodatasets import get_path
 from caf.viz.web import mapping
 
 # %%
-# CONSTANTS 
+# CONSTANTS
 # --------
 COUNTRY_CODE = 0
 REGION_CODE = 3
