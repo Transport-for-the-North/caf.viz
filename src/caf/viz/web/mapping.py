@@ -404,9 +404,9 @@ def produce_map_set(
 
     split_folder = pathlib.Path(output_path.parent, "Split Maps")
     split_folder.mkdir(exist_ok=True)
-    split["clean_map_name"] = split[split_name_column].map(_clean_filename)
+    split["split_zone"] = split[split_name_column].map(_clean_filename)
     split_geom = _load_map_split(
-        split=split, split_name_column="clean_map_name", filter_zone=filter_zone_gpd
+        split=split, split_name_column="split_zone", filter_zone=filter_zone_gpd
     )
 
     # Make overview map with links to split maps
@@ -415,16 +415,16 @@ def produce_map_set(
         '<a href="'
         + split_folder.name
         + "/"
-        + overview_data["clean_map_name"]
+        + overview_data["split_zone"]
         + '.html">'
-        + overview_data["clean_map_name"]
+        + overview_data["split_zone"]
         + "</a>"
     )
     overview_data["popup_text_submap"] = (
         '<a href="'
-        + overview_data["clean_map_name"]
+        + overview_data["split_zone"]
         + '.html">'
-        + overview_data["clean_map_name"]
+        + overview_data["split_zone"]
         + "</a>"
     )
 
@@ -434,7 +434,7 @@ def produce_map_set(
             color_column=None,
             to_filter=False,
             options=ExploreOptions(
-                tooltip=["clean_map_name"],
+                tooltip=["split_zone"],
                 popup="popup_text",
                 style={"fillOpacity": 0.4, "fillColor": "grey", "color": "black"},
             ),
@@ -448,7 +448,7 @@ def produce_map_set(
             color_column=None,
             to_filter=False,
             options=ExploreOptions(
-                tooltip=["clean_map_name"],
+                tooltip=["split_zone"],
                 popup="popup_text_submap",
                 style={"fillOpacity": 0.1, "color": "black", "fillColor": "grey"},
                 highlight_style={"fillOpacity": 0.5},
