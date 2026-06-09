@@ -1,13 +1,18 @@
 """
-Example
+HTML mapping example
 ===========
 
-This is a code example which is displayed but **not** run.
+This is a code example showing how to create an interactive map using the web/mapping module. 
+This example shows two ways to create an interactive html map: A single map with the desired datasets, 
+and a split map consisting of an overview map with the split geometries which link to individual maps showing the datasets for each split geometry. 
+
+The example uses the NUTS dataset from Eurostat and the cities dataset from Natural Earth, both of which are available in geodatasets.
 
 """
 
 # %%
-# IMPORTS #
+# IMPORTS
+# --------
 import pathlib
 
 import geopandas as gpd
@@ -16,7 +21,8 @@ from geodatasets import get_path
 from caf.viz.web import mapping
 
 # %%
-# CONSTANTS #
+# CONSTANTS 
+# --------
 COUNTRY_CODE = 0
 REGION_CODE = 3
 
@@ -25,7 +31,8 @@ PATH_TO_SAVE_MAP = pathlib.Path(r"map.html")
 PATH_TO_SAVE_SPLIT_MAP = pathlib.Path(r"split_map.html")
 
 # %%
-# DATA #
+# DATA
+# --------
 path_to_data = get_path("eurostat.nuts_rg_10m_2024_3035")
 europe = gpd.read_file(path_to_data)
 
@@ -35,7 +42,8 @@ cities = gpd.read_file(path_to_data)
 europe_countries = europe[europe["LEVL_CODE"] == COUNTRY_CODE]
 
 # %%
-# PREPARE DATA #
+# PREPARE DATA
+# --------
 datasets = {"Countries": europe_countries, "Cities": cities}
 
 color_column = {"Countries": None, "Cities": "natscale"}
@@ -66,16 +74,21 @@ else:
     filter_zones = europe_countries
 
 # %%
-# CREATE MAP (single map) #
+# CREATE MAP (single map)
+# --------
 m = mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
 
+# %%
+m
 
 # %%
-# SAVE MAP (OPTIONAL) #
+# SAVE MAP (OPTIONAL)
+# --------
 m.save(PATH_TO_SAVE_MAP)
 
 # %%
-# CREATE MAP (split map) #
+# CREATE MAP (split map)
+# --------
 europe_regions = europe[europe["LEVL_CODE"] == REGION_CODE]
 
 mapping_datasets = {
@@ -94,7 +107,7 @@ mapping_datasets = {
 if europe_countries.crs != mapping.MAP_CRS_EPSG:
     europe_countries = europe_countries.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")
 
-split_m = mapping.produce_map_set(
+mapping.produce_map_set(
     output_path=PATH_TO_SAVE_SPLIT_MAP,
     datasets=mapping_datasets,
     split=europe_countries,
