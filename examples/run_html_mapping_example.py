@@ -76,17 +76,11 @@ else:
     filter_zones = europe_countries
 
 # %%
-# CREATE MAP (single map)
-# ------------------------
-m = mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
-
-# %%
-m  # noqa: B018
-
-# %%
-# SAVE MAP (OPTIONAL)
-# ------------------------
-m.save(PATH_TO_SAVE_MAP)
+# Create a Single Map
+# -------------------
+# :func:`~caf.viz.mapping.map_datasets` will create a :class:`folium.Map` object from the datasets with
+# OpenStreetMap background, it can be saved to a standalone HTML file with :meth:`folium.Map.save`.
+mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
 
 # %%
 # CREATE MAP (split map)
