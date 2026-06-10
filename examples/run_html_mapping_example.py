@@ -83,8 +83,16 @@ else:
 mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
 
 # %%
-# CREATE MAP (split map)
-# ------------------------
+# Create a Split Map
+# ------------------
+# Create a map which is split across multiple HTML files to allow for more detailed
+# data on each subset map, see `Split Map Overview <split_map.html>`_.
+#
+# .. note::
+#     HTML file is written to generated documentation folder, so it's deployed with
+#     documentation, normally this can be saved anywhere.
+PATH_TO_SAVE_SPLIT_MAP = pathlib.Path(r"../docs/build/html/_generated/examples/split_map.html")
+PATH_TO_SAVE_SPLIT_MAP.parent.mkdir(exist_ok=True, parents=True)
 europe_regions = europe[europe["LEVL_CODE"] == REGION_CODE]
 
 mapping_datasets = {
