@@ -9,3 +9,4 @@ geopandas>=1.1.3
 tqdm>=4.67.3
 branca>=0.8.2
 shapely>=2.1.2
+mapclassify>=2.10
