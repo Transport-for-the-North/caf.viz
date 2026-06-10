@@ -28,10 +28,6 @@ from caf.viz.web import mapping
 COUNTRY_CODE = 0
 REGION_CODE = 3
 
-# PATHS
-PATH_TO_SAVE_MAP = pathlib.Path(r"map.html")
-PATH_TO_SAVE_SPLIT_MAP = pathlib.Path(r"split_map.html")
-
 # %%
 # DATA
 # ----------------
