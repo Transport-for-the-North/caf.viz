@@ -97,14 +97,18 @@ mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Eu
 #     HTML file is written to generated documentation folder, so it's deployed with
 #     documentation, normally this can be saved anywhere.
 
-READTHEDOCS_OUTPUT = os.getenv("READTHEDOCS_OUTPUT")
-if READTHEDOCS_OUTPUT is None:
-    PATH_TO_SAVE_SPLIT_MAP = pathlib.Path("split_map.html")
+readthedocs_path = os.getenv("READTHEDOCS_OUTPUT")
+subpath = "html/_generated/examples/split_map.html"
+if readthedocs_path is None:
+    split_map_path = pathlib.Path("../docs/build") / subpath
 else:
-    PATH_TO_SAVE_SPLIT_MAP = (
-        pathlib.Path(READTHEDOCS_OUTPUT) / "html/_generated/examples/split_map.html"
-    )
-PATH_TO_SAVE_SPLIT_MAP.parent.mkdir(exist_ok=True, parents=True)
+    split_map_path = pathlib.Path(readthedocs_path) / subpath
+split_map_path.parent.mkdir(exist_ok=True, parents=True)
+
+# %%
+# Use the data loaded previously to product the set of maps. An overview map with the split
+# data is saved to the ``output_path``, the lower level HTML files with the more detailed
+# data are saved in a "Split Maps" sub-folder and linked to from the overview.
 
 europe_regions = europe[europe["LEVL_CODE"] == REGION_CODE]
 
@@ -125,7 +129,7 @@ if europe_countries.crs != mapping.MAP_CRS_EPSG:
     europe_countries = europe_countries.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")
 
 mapping.produce_map_set(
-    output_path=PATH_TO_SAVE_SPLIT_MAP,
+    output_path=split_map_path,
     datasets=mapping_datasets,
     split=europe_countries,
     split_name_column="NAME_ENGL",
