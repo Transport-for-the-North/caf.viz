@@ -1,6 +1,6 @@
 """
 HTML mapping example
-===========
+====================
 
 This is a code example showing how to create an interactive map using the web/mapping module.
 This example shows two ways to create an interactive html map:
@@ -13,8 +13,8 @@ both of which are available in geodatasets.
 """
 
 # %%
-# IMPORTS
-# ----------------
+# Imports
+# -------
 import pathlib
 
 import geopandas as gpd
@@ -23,14 +23,16 @@ from geodatasets import get_path
 from caf.viz.web import mapping
 
 # %%
-# CONSTANTS
+# Define constants
 # ----------------
+# These are constants used to select the desired data from the geodatasets package.
 COUNTRY_CODE = 0
 REGION_CODE = 3
 
 # %%
-# DATA
-# ----------------
+# Load data
+# ---------
+# Load the datasets to be mapped as :class:`geopandas.GeoDataFrame` objects.
 path_to_data = get_path("eurostat.nuts_rg_10m_2024_3035")
 europe = gpd.read_file(path_to_data)
 
@@ -40,8 +42,11 @@ cities = gpd.read_file(path_to_data)
 europe_countries = europe[europe["LEVL_CODE"] == COUNTRY_CODE]
 
 # %%
-# PREPARE DATA
-# ----------------
+# Prepare datasets for mapping
+# ----------------------------
+# Prepare datasets for mapping as a :class:`mapping.MapData` object, which includes
+# the data, the color column to use, and various mapping options in a
+# :class:`mapping.ExploreOptions` object.
 datasets = {"Countries": europe_countries, "Cities": cities}
 
 color_column = {"Countries": None, "Cities": "natscale"}
@@ -74,8 +79,9 @@ else:
 # %%
 # Create a Single Map
 # -------------------
-# :func:`~caf.viz.mapping.map_datasets` will create a :class:`folium.Map` object from the datasets with
-# OpenStreetMap background, it can be saved to a standalone HTML file with :meth:`folium.Map.save`.
+# :func:`~caf.viz.mapping.map_datasets` will create a :class:`folium.Map` object from the
+# datasets with OpenStreetMap background, it can be saved to a standalone HTML file
+# with :meth:`folium.Map.save`.
 mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
 
 # %%
@@ -103,7 +109,7 @@ mapping_datasets = {
     )
 }
 
-# Check map crs
+# Check map crs for split geometries
 if europe_countries.crs != mapping.MAP_CRS_EPSG:
     europe_countries = europe_countries.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")
 
