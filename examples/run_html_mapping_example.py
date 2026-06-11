@@ -2,8 +2,9 @@
 HTML mapping example
 ====================
 
-This is a code example showing how to create an interactive map using the :mod:`caf.viz.web.mapping`
-module. This example shows two ways to create an interactive html map:
+This is a code example showing how to create an interactive map using the
+:mod:`caf.viz.web.mapping` module.
+This example shows two ways to create an interactive html map:
 
 - A single map with the desired datasets, and
 - A split map consisting of an overview map with the split geometries which link to
