@@ -35,7 +35,7 @@ import matplotlib as mpl
 
 # # # CONSTANTS # # #
 
-NAVY = "#0d0f0d"
+NAVY = "#0d0f3d"
 TEAL = "#00dec6"
 PURPLE = "#7317de"
 PINK = "#e50080"
