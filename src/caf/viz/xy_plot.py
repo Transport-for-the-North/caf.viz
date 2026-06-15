@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 # Third Party
 import matplotlib as mpl
 import numpy as np
+import pandas as pd
 from matplotlib import axes, figure, ticker
 from pydantic import dataclasses
 from scipy import stats
@@ -23,7 +24,6 @@ from caf.viz import subplots, utils
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    import pandas as pd
 
 ##### CONSTANTS #####
 
@@ -71,6 +71,7 @@ class XYPlotType(enum.Enum):
     SCATTER = "scatter"
     SCATTER_DENSITY = "scatter_density"
     HEXBIN = "hexbin"
+    BAR = "bar"
 
     @classmethod
     def _missing_(cls, value) -> XYPlotType | None:  # noqa: ANN001
@@ -210,7 +211,8 @@ def scatter(
 
         if "c" in kwargs:
             warnings.warn(
-                "`c` parameter cannot be used if `cmap` or `density` is provided", stacklevel=2
+                "`c` parameter cannot be used if `cmap` or `density` is provided",
+                stacklevel=2,
             )
             kwargs.pop("c")
 
@@ -226,6 +228,17 @@ def scatter(
         fig.colorbar(points, ax=ax, label=cmap.get_label())
     else:
         fig.colorbar(points, ax=ax, label="Density", ticks=ticker.NullLocator())
+
+
+def bar(
+    fig: figure.Figure,
+    ax: axes.Axes,
+    data: BasicData,
+) -> None:
+    ax.bar(data.data[data.x_column], data.data[data.y_column])
+    ax.set_xlabel(data.x_label)
+    ax.set_ylabel(data.y_label)
+    ax.set_title(data.title)
 
 
 def axes_plot_xy(
@@ -280,6 +293,9 @@ def axes_plot_xy(
             cmap=cmap,
             **plot_kwargs,
         )
+
+    elif type_ == XYPlotType.BAR:
+        bar(fig, ax, data)
 
     else:
         raise NotImplementedError(f"unknown plot type {type_}")
