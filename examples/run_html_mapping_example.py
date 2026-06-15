@@ -2,10 +2,13 @@
 HTML mapping example
 ====================
 
-This is a code example showing how to create an interactive map using the web/mapping module.
+This is a code example showing how to create an interactive map using the
+:mod:`caf.viz.web.mapping` module.
 This example shows two ways to create an interactive html map:
-A single map with the desired datasets,and a split map consisting of an overview map with the
-split geometries which link to individual maps showing the datasets for each split geometry.
+
+- A single map with the desired datasets, and
+- A split map consisting of an overview map with the split geometries which link to
+  individual maps showing the datasets for each split geometry.
 
 The example uses the NUTS dataset from Eurostat and the cities dataset from Natural Earth,
 both of which are available in geodatasets.
@@ -15,6 +18,7 @@ both of which are available in geodatasets.
 # %%
 # Imports
 # -------
+import os
 import pathlib
 
 import geopandas as gpd
@@ -44,9 +48,9 @@ europe_countries = europe[europe["LEVL_CODE"] == COUNTRY_CODE]
 # %%
 # Prepare datasets for mapping
 # ----------------------------
-# Prepare datasets for mapping as a :class:`mapping.MapData` object, which includes
-# the data, the color column to use, and various mapping options in a
-# :class:`mapping.ExploreOptions` object.
+# Prepare datasets for mapping as a :class:`~caf.viz.web.mapping.MapData` object, which
+# includes the data, the color column to use, and various mapping options in a
+# :class:`~caf.viz.web.mapping.ExploreOptions` object.
 datasets = {"Countries": europe_countries, "Cities": cities}
 
 color_column = {"Countries": None, "Cities": "natscale"}
@@ -79,7 +83,7 @@ else:
 # %%
 # Create a Single Map
 # -------------------
-# :func:`~caf.viz.mapping.map_datasets` will create a :class:`folium.Map` object from the
+# :func:`~caf.viz.web.mapping.map_datasets` will create a :class:`folium.Map` object from the
 # datasets with OpenStreetMap background, it can be saved to a standalone HTML file
 # with :meth:`folium.Map.save`.
 mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
@@ -93,8 +97,20 @@ mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Eu
 # .. note::
 #     HTML file is written to generated documentation folder, so it's deployed with
 #     documentation, normally this can be saved anywhere.
-PATH_TO_SAVE_SPLIT_MAP = pathlib.Path(r"../docs/build/html/_generated/examples/split_map.html")
-PATH_TO_SAVE_SPLIT_MAP.parent.mkdir(exist_ok=True, parents=True)
+
+readthedocs_path = os.getenv("READTHEDOCS_OUTPUT")
+subpath = "html/_generated/examples/split_map.html"
+if readthedocs_path is None:
+    split_map_path = pathlib.Path("../docs/build") / subpath
+else:
+    split_map_path = pathlib.Path(readthedocs_path) / subpath
+split_map_path.parent.mkdir(exist_ok=True, parents=True)
+
+# %%
+# Use the data loaded previously to product the set of maps. An overview map with the split
+# data is saved to the ``output_path``, the lower level HTML files with the more detailed
+# data are saved in a "Split Maps" sub-folder and linked to from the overview.
+
 europe_regions = europe[europe["LEVL_CODE"] == REGION_CODE]
 
 mapping_datasets = {
@@ -114,7 +130,7 @@ if europe_countries.crs != mapping.MAP_CRS_EPSG:
     europe_countries = europe_countries.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")
 
 mapping.produce_map_set(
-    output_path=PATH_TO_SAVE_SPLIT_MAP,
+    output_path=split_map_path,
     datasets=mapping_datasets,
     split=europe_countries,
     split_name_column="NAME_ENGL",
