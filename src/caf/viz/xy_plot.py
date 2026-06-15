@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 # Third Party
 import matplotlib as mpl
+import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import axes, figure, ticker
 from pydantic import dataclasses
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import pandas as pd
+    from caf.toolkit import cost_utils
 
 ##### CONSTANTS #####
 
@@ -376,3 +378,89 @@ def plot_xy(
         fig.suptitle(title)
 
     return fig
+
+
+def plot_tld(
+    cost_dist: cost_utils.CostDistribution,
+    ax: mpl.axes.Axes | None = None,
+    *,
+    show_weighted_avg_line: bool = True,
+    show_weighted_avg_points: bool = True,
+    title: str = "Trip Length Distribution",
+    xlabel: str = "Trip Length",
+    ylabel: str = "Number of Trips",
+) -> mpl.axes.Axes:
+    """
+    Plot a standard Trip Length Distribution (TLD) from a CostDistribution.
+
+    Parameters
+    ----------
+    cost_dist : cost_utils.CostDistribution
+        CostDistribution containing the data to plot.
+    ax : mpl.axes.Axes, optional
+        Axis to plot on. If None, a new figure and axis will be created.
+    show_weighted_avg_line : bool, default True
+        Whether to show the weighted average line.
+    show_weighted_avg_points : bool, default True
+        Whether to show the weighted average points for each bin.
+    title : str, default "Trip Length Distribution"
+        Title of the plot.
+    xlabel : str, default "Trip Length"
+        Label for the x-axis.
+    ylabel : str, default "Number of Trips"
+        Label for the y-axis.
+
+    Returns
+    -------
+    mpl.axes.Axes
+        Axis with the plot.
+    """
+    # Create axis if needed
+    if ax is None:
+        _fig, ax = plt.subplots(figsize=(8, 5))
+
+    # Bin widths
+    widths = cost_dist.max_vals - cost_dist.min_vals
+
+    # Plot bars
+    ax.bar(
+        x=cost_dist.avg_vals,
+        height=cost_dist.trip_vals,
+        width=widths,
+        align="center",
+        edgecolor="black",
+    )
+
+    # Plot the weighted average as a vertical line
+    if show_weighted_avg_line:
+        total_trips = np.sum(cost_dist.trip_vals)
+
+        if total_trips > 0:
+            weighted_avg = (
+                np.sum(cost_dist.weighted_avg_vals * cost_dist.trip_vals) / total_trips
+            )
+
+            ax.axvline(
+                x=weighted_avg,
+                color="C1",
+                linestyle="--",
+                label=f"Weighted Avg: {weighted_avg:.2f}",
+            )
+            ax.legend()
+
+    # Plot the weighted average points for each bin as a scatter plot
+    if show_weighted_avg_points:
+        ax.scatter(
+            cost_dist.weighted_avg_vals,
+            cost_dist.trip_vals,
+            color="C2",
+            label=f"Weighted Avg. {xlabel}",
+        )
+        ax.legend()
+
+    # Formatting
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+
+    return ax
