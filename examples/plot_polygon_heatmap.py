@@ -62,7 +62,7 @@ fig = mapping.heatmap_figure(
     geodata,
     "value",
     "Example NUTS Zones with Generated Bins & Zoomed Sub-Plot",
-    zoomed_bounds=mapping.Bounds(4006001, 3024499, 4465735, 3866698),
+    zoomed_bounds=mapping.Extent(4006001, 3024499, 4465735, 3866698),
     n_bins=8,
 )
 
@@ -87,5 +87,5 @@ fig = mapping.heatmap_figure(
     "Example NUTS Zones with a Polygon Boundary",
     n_bins=8,
     polygon_boundary=boundary,
-    zoomed_bounds=mapping.Bounds(*boundary.bounds),
+    zoomed_bounds=mapping.Extent(*boundary.bounds),
 )

@@ -9,18 +9,22 @@ import itertools
 import logging
 import math
 import re
+import time
 import warnings
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any, Self
 
+import contextily
 import mapclassify
 import numpy as np
 import pandas as pd
+import requests
 from matplotlib import cm, patches
 from matplotlib import pyplot as plt
 from shapely import geometry
 
 if TYPE_CHECKING:
     import geopandas as gpd
+    import xyzservices
 
 
 ##### CONSTANTS #####
@@ -47,13 +51,18 @@ class CustomCmap:
         )
 
 
-class Bounds(NamedTuple):
-    """Coordinates for geospatial extent."""
+@dataclasses.dataclass
+class Extent:
+    """Bounding box / extent for a map."""
 
-    min_x: int
-    min_y: int
-    max_x: int
-    max_y: int
+    xmin: float
+    ymin: float
+    xmax: float
+    ymax: float
+
+    def as_tuple(self) -> tuple[float, float, float, float]:
+        """Convert to tuple in format (xmin, ymin, xmax, ymax)."""
+        return (self.xmin, self.ymin, self.xmax, self.ymax)
 
 
 @dataclasses.dataclass
@@ -247,7 +256,7 @@ def heatmap_figure(
     positive_negative_colormaps: bool = False,
     legend_label_fmt: str = "{:.1%}",
     legend_title: str | None = None,
-    zoomed_bounds: Bounds | None = None,
+    zoomed_bounds: Extent | None = None,
     missing_kwds: dict[str, Any] | None = None,
     annotation: str | None = None,
 ) -> plt.Figure:
@@ -408,8 +417,8 @@ def heatmap_figure(
                 label.set_text(f"{values.lower_formatted} - {values.upper_formatted}")
 
     if zoomed_bounds is not None:
-        axes[1].set_xlim(zoomed_bounds.min_x, zoomed_bounds.max_x)
-        axes[1].set_ylim(zoomed_bounds.min_y, zoomed_bounds.max_y)
+        axes[1].set_xlim(zoomed_bounds.xmin, zoomed_bounds.xmax)
+        axes[1].set_ylim(zoomed_bounds.ymin, zoomed_bounds.ymax)
 
     if annotation is not None:
         axes[ncols - 1].annotate(
@@ -418,4 +427,223 @@ def heatmap_figure(
             xycoords="figure fraction",
             bbox=dict(boxstyle="square", fc="white"),
         )
+    return fig
+
+
+def _get_basemap(
+    ax: plt.Axes,
+    source: xyzservices.TileProvider,
+    max_retries: int,
+    wait: int,
+) -> tuple[
+    np.ndarray[tuple[int, int, int], np.dtype[np.unsignedinteger]],
+    tuple[float, float, float, float],
+]:
+    """Retrieve basemap image from a tile source with retry logic.
+
+    Parameters
+    ----------
+    ax
+        Matplotlib axes to get bounds from.
+    source
+        Contextily tile source.
+    max_retries
+        Maximum number of retry attempts.
+    wait
+        Seconds to wait between retry attempts.
+
+    Returns
+    -------
+    tuple
+        Tuple of (image array, extent bounds).
+
+    Raises
+    ------
+    requests.exceptions.ConnectionError
+        If max retries exceeded.
+    """
+    xmin, xmax, ymin, ymax = ax.axis()
+    count = 0
+    while True:
+        try:
+            return contextily.bounds2img(xmin, ymin, xmax, ymax, source=source)
+        except requests.exceptions.ConnectionError as exc:
+            if count >= max_retries:
+                exc.add_note(f"max retries ({max_retries}) reached")
+                raise
+            LOG.debug("failed retrieving basemap, retrying: %s", exc)
+            count += 1
+            time.sleep(wait)
+
+
+def add_grayscale_basemap(
+    ax: plt.Axes,
+    zorder: float = -1,
+    source: xyzservices.TileProvider | None = None,
+) -> None:
+    """Add a grayscale basemap to the axes.
+
+    Plot CRS should be the same as the source basemap being used
+    for OSM this is EPSG: 3857.
+
+    Parameters
+    ----------
+    ax
+        Plot axes to add the map to.
+    zorder
+        Z position to render the basemap in, defaults to -1 so
+        it is behind other features.
+    source
+        Source for the basemap to use, if None defaults to
+        OSM basemap, plot CRS should be EPSG: 3857.
+
+    See Also
+    --------
+    :func:`contextily.add_basemap`
+        to add a basemap to axes without converting it to grayscale.
+    `xyzservices <https://xyzservices.readthedocs.io/>`_
+        for the details of the basemaps available.
+    """
+    if source is None:
+        source = contextily.providers.OpenStreetMap.Mapnik
+    img, extent = _get_basemap(ax, source, 5, 1)
+    rgb = img[..., :3].astype(np.float32)
+    gray = np.dot(rgb, [0.299, 0.587, 0.114])
+
+    ax.imshow(
+        gray, extent=extent, origin="upper", cmap="gray", vmin=0, vmax=255, zorder=zorder
+    )
+
+    matched = re.search(r'<a href=(".+")', source.get("html_attribution"))
+    if matched is None:
+        contextily.add_attribution(ax, source.get("attribution"))
+    else:
+        contextily.add_attribution(ax, source.get("attribution"), url=matched.group(1))
+
+
+def _calculate_axis_limits(
+    xmin: float,
+    xmax: float,
+    ymin: float,
+    ymax: float,
+    *,
+    aspect_ratio: float,
+    tolerance: float,
+) -> tuple[float, float, float, float]:
+    """Scale axis limits to ratio recursively until tolerance is met."""
+    if tolerance <= 0:
+        raise ValueError(f"tolerance should be a positive real number not {tolerance}")
+
+    xdiff = abs(xmax - xmin)
+    ydiff = abs(ymax - ymin)
+    ratio = xdiff / ydiff
+
+    if abs(ratio - aspect_ratio) <= tolerance:
+        return xmin, xmax, ymin, ymax
+    if ratio < aspect_ratio:  # Adjust X
+        adjustment = (ydiff * aspect_ratio) - xdiff
+        xmin -= adjustment // 2
+        xmax += adjustment // 2
+    else:  # Adjust y
+        adjustment = (xdiff * aspect_ratio) - ydiff
+        ymin -= adjustment // 2
+        ymax += adjustment // 2
+
+    return _calculate_axis_limits(
+        xmin,
+        xmax,
+        ymin,
+        ymax,
+        aspect_ratio=aspect_ratio,
+        tolerance=tolerance,
+    )
+
+
+def scale_axis(ax: plt.Axes, aspect_ratio: float = 1.5, tolerance: float = 0.1) -> None:
+    """Scale limits of X / Y to meet `aspect_ratio`."""
+    xmin, xmax, ymin, ymax = _calculate_axis_limits(
+        *ax.axis(), aspect_ratio=aspect_ratio, tolerance=tolerance
+    )
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+
+@dataclasses.dataclass
+class LayerOptions:
+    """Options for plotting a layer."""
+
+    edgecolor: str | None = None
+    facecolor: str | None = None
+    color: str | None = None
+    zorder: int = 0
+    size: float | None = None
+
+    def __post_init__(self) -> Self:
+        """Set edge and face color to color if given."""
+        if self.color is not None:
+            if self.edgecolor is not None or self.facecolor is not None:
+                warnings.warn(
+                    "color supersedes edgecolor and facecolor", RuntimeWarning, stacklevel=2
+                )
+            self.edgecolor = self.color
+            self.facecolor = self.color
+        return self
+
+
+@dataclasses.dataclass
+class LayerData:
+    """Data and options for a layer to map."""
+
+    data: gpd.GeoDataFrame
+    ops: LayerOptions
+
+
+def simple_map(
+    layers: dict[str, LayerData],
+    legend_title: str,
+    extent: Extent | None = None,
+) -> plt.Figure:
+    """Plot GeoSpatial data on a map with a grayscale background.
+
+    Parameters
+    ----------
+    layers
+        Layers to be plotted.
+    legend_title
+        Title for the legend.
+    extent
+        Optional bounding box clip the map to.
+
+    Returns
+    -------
+    plt.Figure
+        Figure containing a single axes with plotted data.
+    """
+    fig, ax = plt.subplots(1, figsize=(15, 10), layout="compressed", frameon=False)
+    ax.set_axis_off()
+
+    for name, layer in layers.items():
+        data = layer.data.to_crs(epsg=3857)
+        if extent is not None:
+            data = data.clip_by_rect(extent.as_tuple())
+        data.plot(
+            ax=ax,
+            label=name,
+            edgecolor=layer.ops.edgecolor,
+            facecolor=layer.ops.facecolor,
+            zorder=layer.ops.zorder,
+            markersize=None if layer.ops.size is None else layer.ops.size,
+            linewidth=None if layer.ops.size is None else layer.ops.size,
+        )
+
+    ax.legend(title=legend_title)
+    if extent is not None:
+        ax.set_xlim(extent.xmin, extent.xmax)
+        ax.set_ylim(extent.ymin, extent.ymax)
+
+    ax.set_aspect("equal")
+    scale_axis(ax)
+    add_grayscale_basemap(ax)
+
     return fig
