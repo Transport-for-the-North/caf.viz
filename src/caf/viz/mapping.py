@@ -109,6 +109,11 @@ def _colormap_classify(
     finite = data.dropna()
     if finite.empty:
         # Return empty colour map
+        warnings.warn(
+            "all values are non-finite so returning an empty colormap",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return CustomCmap(pd.Series(dtype=float), pd.DataFrame(dtype=float), [])
 
     if bins is not None:
@@ -309,7 +314,7 @@ def heatmap_figure(
         column=column_name,
         cmap="viridis_r",
         scheme="NaturalBreaks",
-        k=7,
+        k=n_bins,
         legend_kwds=dict(
             title=legend_title or str(column_name).title(),
             **legend_kwargs,
@@ -375,18 +380,16 @@ def heatmap_figure(
             del kwargs["k"]
 
         # If the quatiles scheme throws a warning then use FisherJenksSampled
-        warnings.simplefilter("error", category=UserWarning)
-        try:
-            geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
-            if zoomed_bounds is not None:
-                geodata.plot(ax=axes[1], legend=True, **kwargs)
-        except UserWarning:
-            kwargs["scheme"] = "FisherJenksSampled"
-            geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
-            if zoomed_bounds is not None:
-                geodata.plot(ax=axes[1], legend=True, **kwargs)
-        finally:
-            warnings.simplefilter("default", category=UserWarning)
+        with warnings.catch_warnings(action="error", category=UserWarning):
+            try:
+                geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
+                if zoomed_bounds is not None:
+                    geodata.plot(ax=axes[1], legend=True, **kwargs)
+            except UserWarning:
+                kwargs["scheme"] = "FisherJenksSampled"
+                geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
+                if zoomed_bounds is not None:
+                    geodata.plot(ax=axes[1], legend=True, **kwargs)
 
         # Format legend text
         legend = axes[ncols - 1].get_legend()
