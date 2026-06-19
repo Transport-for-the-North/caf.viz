@@ -1,6 +1,6 @@
 # package linters
 ruff>=0.12
-pylint>=3.3.1
+pylint>=4.0.6
 mypy>=1.0.0
 mypy_extensions>=1.0.0
 
