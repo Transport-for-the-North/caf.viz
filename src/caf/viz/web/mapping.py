@@ -137,8 +137,28 @@ class ExploreOptions:
     cmap: str | list[str] = "viridis"
     show: bool = True
     categorical: bool | None = None
-    """Whether the legend should be categorical or not.
-    If None defaults to False for numeric columns and true for other types."""
+    """Whether the legend should be categorical or not."""
+
+    def infer_categorical(self, data: pd.Series | None) -> bool:
+        """Infer categorical value if it isn't given.
+
+        Returns
+        -------
+        bool
+            - Attribute value if not None; or
+            - False if `data` is None or dtype of `data`
+              is numeric; or
+            - True for any other dtypes (including boolean).
+        """
+        if self.categorical is not None:
+            return self.categorical
+        if data is None:
+            return False
+
+        # is_numeric_dtype returns true for bool so checking that first
+        if pd.api.types.is_bool_dtype(data):
+            return True
+        return not pd.api.types.is_numeric_dtype(data)
 
 
 @dataclasses.dataclass()
@@ -174,17 +194,11 @@ def _explore(
     else:
         legend = {}
 
-    if options.categorical is None:
-        if data_column is None:
-            categorical = False
-        else:
-            categorical = not pd.api.types.is_numeric_dtype(data[data_column])
-    else:
-        categorical = options.categorical
-
     data.explore(
         data_column,
-        categorical=categorical,
+        categorical=options.infer_categorical(
+            None if data_column is None else data[data_column]
+        ),
         cmap=options.cmap,
         legend=options.show_legend,
         m=map_,
