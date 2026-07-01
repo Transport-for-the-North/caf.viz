@@ -10,6 +10,7 @@ from typing import NamedTuple, Self
 
 import folium
 import geopandas as gpd
+import pandas as pd
 import tqdm
 from branca.element import Element, MacroElement, Template
 from shapely import geometry
@@ -87,6 +88,14 @@ HEAD = """
     .textbox-content {
         transition: all 0.3s ease;
     }
+    /* Continuous colorbar (Branca) */
+    .legend.leaflet-control:not(:empty) {
+        background: white;
+        padding: 8px 10px;
+        border: 1px solid #999;
+        border-radius: 4px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    }
     </style>
     {% endmacro %}
     """
@@ -127,6 +136,9 @@ class ExploreOptions:
     legend_title: str | None = None
     cmap: str | list[str] = "viridis"
     show: bool = True
+    categorical: bool | None = None
+    """Whether the legend should be categorical or not.
+    If None defaults to False for numeric columns and true for other types."""
 
 
 @dataclasses.dataclass()
@@ -162,9 +174,17 @@ def _explore(
     else:
         legend = {}
 
+    if options.categorical is None:
+        if data_column is None:
+            categorical = False
+        else:
+            categorical = not pd.api.types.is_numeric_dtype(data[data_column])
+    else:
+        categorical = options.categorical
+
     data.explore(
         data_column,
-        categorical=data_column is not None,
+        categorical=categorical,
         cmap=options.cmap,
         legend=options.show_legend,
         m=map_,
