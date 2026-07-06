@@ -10,6 +10,7 @@ from typing import NamedTuple, Self
 
 import folium
 import geopandas as gpd
+import pandas as pd
 import tqdm
 from branca.element import Element, MacroElement, Template
 from shapely import geometry
@@ -87,6 +88,14 @@ HEAD = """
     .textbox-content {
         transition: all 0.3s ease;
     }
+    /* Continuous colorbar (Branca) */
+    .legend.leaflet-control:not(:empty) {
+        background: white;
+        padding: 8px 10px;
+        border: 1px solid #999;
+        border-radius: 4px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    }
     </style>
     {% endmacro %}
     """
@@ -127,6 +136,29 @@ class ExploreOptions:
     legend_title: str | None = None
     cmap: str | list[str] = "viridis"
     show: bool = True
+    categorical: bool | None = None
+    """Whether the legend should be categorical or not."""
+
+    def infer_categorical(self, data: pd.Series | None) -> bool:
+        """Infer categorical value if it isn't given.
+
+        Returns
+        -------
+        bool
+            - Attribute value if not None; or
+            - False if `data` is None or dtype of `data`
+              is numeric; or
+            - True for any other dtypes (including boolean).
+        """
+        if self.categorical is not None:
+            return self.categorical
+        if data is None:
+            return False
+
+        # is_numeric_dtype returns true for bool so checking that first
+        if pd.api.types.is_bool_dtype(data):
+            return True
+        return not pd.api.types.is_numeric_dtype(data)
 
 
 @dataclasses.dataclass()
@@ -164,7 +196,9 @@ def _explore(
 
     data.explore(
         data_column,
-        categorical=data_column is not None,
+        categorical=options.infer_categorical(
+            None if data_column is None else data[data_column]
+        ),
         cmap=options.cmap,
         legend=options.show_legend,
         m=map_,
