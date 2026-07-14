@@ -338,7 +338,7 @@ def map_datasets(
     folium.LayerControl(collapsed=False).add_to(map_)
 
     # Fit map to bounds of mask or last dataset
-    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.union_all().bounds)
+    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.total_bounds)
     map_.fit_bounds([[bounds.min_y, bounds.min_x], [bounds.max_y, bounds.max_x]])
 
     if output_path is None:
