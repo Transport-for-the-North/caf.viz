@@ -136,7 +136,10 @@ class TooltipOptions:
     @property
     def kwargs(self) -> dict:
         """Get keyword arguments for :class:`folium.features.GeoJsonTooltip`."""
-        kwargs = {"labels": self.labels, "localize": self.localize}
+        kwargs: dict[str, bool | list[str]] = {
+            "labels": self.labels,
+            "localize": self.localize,
+        }
         if self.aliases is not None:
             kwargs["aliases"] = [self.aliases.get(i, i) for i in self.columns]
         return kwargs
