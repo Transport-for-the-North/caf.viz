@@ -125,11 +125,32 @@ class Bounds(NamedTuple):
 
 
 @dataclasses.dataclass
+class TooltipOptions:
+    """Options for folium tooltips."""
+
+    columns: list[str]
+    aliases: dict[str, str] | None = None
+    labels: bool = True
+    localize: bool = True
+
+    @property
+    def kwargs(self) -> dict:
+        """Get keyword arguments for :class:`folium.features.GeoJsonTooltip`."""
+        kwargs: dict[str, bool | list[str]] = {
+            "labels": self.labels,
+            "localize": self.localize,
+        }
+        if self.aliases is not None:
+            kwargs["aliases"] = [self.aliases.get(i, i) for i in self.columns]
+        return kwargs
+
+
+@dataclasses.dataclass
 class ExploreOptions:
     """Options for MapData."""
 
     show_legend: bool = True
-    tooltip: bool | list[str] = False
+    tooltip: bool | list[str] | TooltipOptions = False
     popup: bool | str | list[str] = False
     style: dict = dataclasses.field(default_factory=dict)
     highlight_style: dict = dataclasses.field(default_factory=dict)
@@ -159,6 +180,16 @@ class ExploreOptions:
         if pd.api.types.is_bool_dtype(data):
             return True
         return not pd.api.types.is_numeric_dtype(data)
+
+    def get_tooltip_options(self, data: gpd.GeoDataFrame) -> TooltipOptions:
+        """Get :class:`TooltipOptions` from given tooltip."""
+        if isinstance(self.tooltip, TooltipOptions):
+            return self.tooltip
+        if isinstance(self.tooltip, list):
+            return TooltipOptions(self.tooltip)
+        if self.tooltip:
+            return TooltipOptions(data.columns.to_list())
+        return TooltipOptions([])
 
 
 @dataclasses.dataclass()
@@ -194,6 +225,7 @@ def _explore(
     else:
         legend = {}
 
+    tooltip = options.get_tooltip_options(data)
     data.explore(
         data_column,
         categorical=options.infer_categorical(
@@ -202,7 +234,8 @@ def _explore(
         cmap=options.cmap,
         legend=options.show_legend,
         m=map_,
-        tooltip=options.tooltip,
+        tooltip=tooltip.columns,
+        tooltip_kwds=tooltip.kwargs,
         popup=options.popup,
         tiles=None,
         name=name,
@@ -338,7 +371,7 @@ def map_datasets(
     folium.LayerControl(collapsed=False).add_to(map_)
 
     # Fit map to bounds of mask or last dataset
-    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.union_all().bounds)
+    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.total_bounds)
     map_.fit_bounds([[bounds.min_y, bounds.min_x], [bounds.max_y, bounds.max_x]])
 
     if output_path is None:
