@@ -188,7 +188,7 @@ class ExploreOptions:
         if isinstance(self.tooltip, list):
             return TooltipOptions(self.tooltip)
         if self.tooltip:
-            return TooltipOptions(data.columns.to_list())
+            return TooltipOptions([i for i in data.columns if i != data.geometry.name])
         return TooltipOptions([])
 
 
