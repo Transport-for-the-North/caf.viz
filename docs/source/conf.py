@@ -94,7 +94,7 @@ sphinx_gallery_conf = {
     "backreferences_dir": "_generated/examples/backrefs",  # path to the backreferences files
     "doc_module": ("caf.viz",),
     # Regex pattern of filenames to be ran so the output can be included
-    "filename_pattern": rf"{re.escape(os.sep)}run_.*\.py",
+    "filename_pattern": rf"{re.escape(os.sep)}(run|plot)_.*\.py",
 }
 
 # -- Options for Linking to external docs (intersphinx) ----------------------
