@@ -34,7 +34,8 @@ def plot_demand(
     show: bool = False,
     return_fig: bool = False,
     plot_title: str = None,
-    legend_title: str = None
+    legend_title: str = None,
+    total_title: str = None,
 ):
     nodes = centroids.set_index(id_col)['geometry']
     o = nodes.copy()
@@ -45,6 +46,8 @@ def plot_demand(
     matrix.columns = ['o', 'd', 'trips']
     matrix = matrix.set_index(['o', 'd'])
     line_matrix = matrix.join(o, how='right').join(d, rsuffix='_o', lsuffix='_d', how='right')
+
+    total_demand = matrix["trips"].abs().sum()
 
     trunc_line = line_matrix[
         (line_matrix['trips'] > demand_threshold) |
@@ -94,20 +97,39 @@ def plot_demand(
     # trunc_line: GeoDataFrame with 'geometry' (LineString) and 'trips' columns
     # Split inter-zonal flows into positive and negative
     pos_inters = inters_plot[inters_plot['trips'] > 0]
+    pos_inters = pos_inters.nlargest(
+        3000,
+        "trips"
+    )
     neg_inters = inters_plot[inters_plot['trips'] < 0]
-    # Normalizers for positive and negative
-    max_pos = max(
-        pos_inters['trips'].max() if not pos_inters.empty else 0,
-        pos_intras['trips'].max() if not pos_intras.empty else 0
+    # ------------------------------------------------------------------
+    # Robust normalisation using 95th percentile clipping
+    # ------------------------------------------------------------------
+
+    all_pos = pd.concat([
+        pos_inters['trips'] if not pos_inters.empty else pd.Series(dtype=float),
+        pos_intras['trips'] if not pos_intras.empty else pd.Series(dtype=float)
+    ])
+
+    all_neg = pd.concat([
+        abs(neg_inters['trips']) if not neg_inters.empty else pd.Series(dtype=float),
+        abs(neg_intras['trips']) if not neg_intras.empty else pd.Series(dtype=float)
+    ])
+
+    vmax_pos = np.percentile(all_pos, 99) if len(all_pos) else 1
+    vmax_neg = np.percentile(all_neg, 99) if len(all_neg) else 1
+
+    norm_pos = Normalize(
+        vmin=demand_threshold,
+        vmax=vmax_pos,
+        clip=True
     )
 
-    norm_pos = Normalize(vmin=0, vmax=max_pos if max_pos > 0 else 1, clip=True)
-    max_neg = max(
-        abs(neg_inters['trips'].min()) if not neg_inters.empty else 0,
-        abs(neg_intras['trips'].min()) if not neg_intras.empty else 0
+    norm_neg = Normalize(
+        vmin=demand_threshold,
+        vmax=vmax_neg,
+        clip=True
     )
-
-    norm_neg = Normalize(vmin=0, vmax=max_neg if max_neg > 0 else 1, clip=True)
 
     fig, ax = plt.subplots(figsize=(8, 10), facecolor=tfn_constants.NAVY)
     ax.set_facecolor(tfn_constants.NAVY)
@@ -118,7 +140,7 @@ def plot_demand(
         ax=ax,
         color="#b0b8c0",
         linewidth=0.4,
-        alpha=0.2,
+        alpha=0.6,
         zorder=0
     )
 
@@ -129,23 +151,69 @@ def plot_demand(
     # Plot positive flows with glow effect
     for lw, alpha in zip(lws, alphas):
         if not pos_inters.empty:
-            alpha_plot = alpha * norm_pos(pos_inters['trips'])
-            pos_inters.plot(ax=ax, color=POS_COLOR, alpha=alpha_plot, linewidth=lw, zorder=1, rasterized=True)
+            alpha_plot = (
+                    alpha *
+                    np.sqrt(
+                        norm_pos(pos_inters['trips'])
+                    )
+            )
 
+            pos_inters.plot(
+                ax=ax,
+                color=POS_COLOR,
+                alpha=alpha_plot,
+                linewidth=lw,
+                zorder=1,
+                rasterized=True
+            )
     # Plot negative flows with glow effect
     for lw, alpha in zip(lws, alphas):
         if not neg_inters.empty:
-            alpha_plot = alpha * np.sqrt(norm_neg(abs(neg_inters['trips'])))
-            neg_inters.plot(ax=ax, color=NEG_COLOR, alpha=alpha_plot, linewidth=lw, zorder=1, rasterized=True)
+            alpha_plot = (
+                    alpha *
+                    np.sqrt(
+                        norm_neg(
+                            abs(neg_inters['trips'])
+                        )
+                    )
+            )
+
+            neg_inters.plot(
+                ax=ax,
+                color=NEG_COLOR,
+                alpha=alpha_plot,
+                linewidth=lw,
+                zorder=1,
+                rasterized=True
+            )
 
     # Optionally, plot nodes (intras) split by sign
     if not pos_intras.empty:
         for lw, alpha in zip(lws, alphas):
-            pos_intras.plot(ax=ax, color=POS_COLOR, markersize=lw/2, alpha=norm_pos(pos_intras['trips']) * alpha, zorder=2, rasterized=True)
+            pos_intras.plot(
+                ax=ax,
+                color=POS_COLOR,
+                markersize=lw / 2,
+                alpha=np.sqrt(
+                    norm_pos(pos_intras['trips'])
+                ) * alpha,
+                zorder=2,
+                rasterized=True
+            )
     if not neg_intras.empty:
         for lw, alpha in zip(lws, alphas):
-            neg_intras.plot(ax=ax, color=NEG_COLOR, markersize=lw/2, alpha=norm_neg(abs(neg_intras['trips'])) * alpha, zorder=2, rasterized=True)
-
+            neg_intras.plot(
+                ax=ax,
+                color=NEG_COLOR,
+                markersize=lw / 2,
+                alpha=np.sqrt(
+                    norm_neg(
+                        abs(neg_intras['trips'])
+                    )
+                ) * alpha,
+                zorder=2,
+                rasterized=True
+            )
     if show_direction:
         def add_half_arrows(gdf, color, norm_fn, is_negative=False):
             if gdf.empty:
@@ -161,7 +229,14 @@ def plot_demand(
                     continue
 
                 trip_val = row['trips']
-                norm_val = np.sqrt(norm_fn(abs(trip_val))) if is_negative else norm_fn(trip_val)
+                if is_negative:
+                    norm_val = np.sqrt(
+                        norm_fn(abs(trip_val))
+                    )
+                else:
+                    norm_val = np.sqrt(
+                        norm_fn(trip_val)
+                    )
                 if norm_val < direction_min_normalized:
                     continue
 
@@ -273,7 +348,7 @@ def plot_demand(
 
     if legend_title is not None:
         ax.text(
-            0.05, y_base + y_step * 2, legend_title,
+            0.0005, y_base + y_step * 1.2, legend_title,
             color="white",
             fontsize=11,
             ha='left',
@@ -292,6 +367,17 @@ def plot_demand(
             loc='center'
         )
 
+    # Add total absolute magnitude demand text box
+    ax.text(
+        0.0005, 0.7,
+        f"{total_title}:\n{total_demand:,.0f}",
+        transform=ax.transAxes,
+        fontsize=10,
+        color="white",
+        ha="left",
+        va="bottom",
+        zorder=20
+    )
     ax.text(1- logo_pad, logo_pad - 0.02, "Source: Transport for the North", color='white', fontsize=9, ha='right', va='top', transform=ax.transAxes)
 
     # Optionally add a PNG logo to the bottom-right corner.
@@ -322,26 +408,35 @@ def plot_demand(
 if __name__ == '__main__':
     # Inputs to change for Caf.Viz
     # Provide zone system nodes shape file
-    gdf = gpd.read_file(r"G:\policy-builder\inputs\Zoning\NoHAM_zones_v3.8\NoHAM_Zones_v3.8_nodes_tfn.shp")
+    gdf = gpd.read_file(r"G:\policy-explorer\CaS_Plots_Work\Updates 070826\MSOAs_no_Externals_centroids.shp")
     # Provide node ID column name
-    gdf_id_col = "ZONE ID_v3"
+    gdf_id_col = "Area"
     # Provide zone system shapefile
-    gdf_zone = gpd.read_file(r"G:\policy-builder\inputs\Zoning\NoHAM_zones_v3.8\NoHAM_Zones_v3.8_tfn.shp")
+    gdf_zone = gpd.read_file(r"G:\policy-explorer\CaS_Plots_Work\Updates 070826\MSOAs_no_Externals.shp")
 
     # Provide path to demand file
-    demand = pd.read_csv(r"G:\policy-builder\inputs\NoHAM_sqaure_matrices\base_2023_am_1_demand.csv")
+    demand = pd.read_csv(r"E:\Policy Builder\Demand Matrices\Demand HWY MSOAs NO Externals.csv")
 
     # Provide location of logo image
-    logo = r"G:\policy-builder\CaS_Plots_Work\tfn-logo.png"
+    logo = r"G:\policy-explorer\CaS_Plots_Work\tfn-logo.png"
     # Provide a plot title
-    title = "Policy Builder Demand Change"
+    title = "Policy Builder HWY Demand (WYCA Area Only)"
+    # Provide a total title
+    total_title = "Total Demand (trips)"
     # Provide a plot legend title
-    legend = "Demand change\n(trips)"
+    legend = "Demand (trips):"
 
     # Provide output path
-    output_path = r"E:\Policy Builder\Caf.Vis test\plot.pdf"
+    output_path_1 = r"E:\Policy Builder\Caf.Vis test\Updated 082026\plot_msoas_no_externals_with_total.pdf"
 
-    # run plot_demand
-    plot_demand(gdf, gdf_id_col, gdf_zone, demand,
-        1, [9,6,3], [0.15,0.32,0.7], True, True, 0.08, 0.8, 9, 0.15, 0.03, 0.12, logo,
-        plot_title=title, legend_title=legend, output_path=Path(output_path), show=False, return_fig=False)
+    # Additional Inputs - SECTORIZED (Add if want to run otherwise set run_sectorised to 'No' in run_caf_vis_plot)
+    # Provide matrix to sectorized matrix lookup
+    # lookup = pd.read_csv(r"G:\policy-builder\inputs\Zoning\noham_3_8_to_noham_sector_v2_spatial.csv")
+    # Provide zone system nodes shape file SECTORIZED
+    # gdf_sector = gpd.read_file(r"G:\policy-builder\inputs\Zoning\NoHAM_sectors_v2\NoHAM_sector_system_V2_nodes_tfn.shp")
+    # Provide node ID column name SECTORIZED
+    # gdf_id_col_sector = "Code"
+    # Provide zone system shapefileSECTORIZED
+    # gdf_zone_sector = gpd.read_file(r"G:\policy-builder\inputs\Zoning\NoHAM_sectors_v2\NoHAM_sector_system_V2_tfn.shp")
+    # Provide output path
+    # output_path_2 = r"E:\Policy Builder\Caf.Vis test\plot_noham_3_8_sectors.pdf"
