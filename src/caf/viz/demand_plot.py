@@ -11,15 +11,38 @@ from pathlib import Path
 from caf.viz import tfn_constants
 
 
+def _left_curve(geom: LineString, curve_ratio: float, n_points: int = 30) -> LineString:
+    coords = list(geom.coords)
+    if len(coords) < 2:
+        return geom
+    x0, y0 = coords[0]
+    x1, y1 = coords[-1]
+    dx = x1 - x0
+    dy = y1 - y0
+    chord = np.hypot(dx, dy)
+    if chord == 0:
+        return geom
+
+    nx = -dy / chord
+    ny = dx / chord
+    mx = 0.5 * (x0 + x1)
+    my = 0.5 * (y0 + y1)
+    cx = mx + nx * chord * curve_ratio
+    cy = my + ny * chord * curve_ratio
+
+    t = np.linspace(0, 1, n_points)
+    one_minus_t = 1 - t
+    xs = one_minus_t**2 * x0 + 2 * one_minus_t * t * cx + t**2 * x1
+    ys = one_minus_t**2 * y0 + 2 * one_minus_t * t * cy + t**2 * y1
+    return LineString(zip(xs, ys))
+
+
 def plot_matrix(
-    centroids: gpd.GeoSeries,
-    id_col: str,
     zones: gpd.GeoSeries,
     matrix: pd.DataFrame,
     demand_threshold: float,
-    lws: list[int],
-    alphas: list[float],
-    plot_nodes: bool = True,
+    *,
+    bounds: tuple(float, float, float, float) | None = None,
     show_direction: bool = False,
     curve_left_ratio: float = 0.08,
     direction_arrow_alpha: float = 0.8,
@@ -27,17 +50,32 @@ def plot_matrix(
     direction_min_normalized: float = 0.15,
     direction_arrow_offset_ratio: float = 0.03,
     direction_arrow_span_ratio: float = 0.12,
-    logo_path: Path = None,
+    logo_path: Path | None = None,
     logo_zoom: float = 0.4,
     logo_alpha: float = 1.0,
     logo_pad: float = 0.02,
-    output_path: Path = None,
-    show: bool = False,
-    return_fig: bool = False,
-    plot_title: str = None,
-    legend_title: str = None,
-    total_title: str = None,
+    output_path: Path | None = None,
+    plot_title: str | None = None,
+    legend_title: str | None = None,
+    total_title: str | None = None,
+    line_widths: list[int] | int | None = None,
+    alphas: list[float] | float | None = None,
 ):
+
+    # multiple line width and alphas to stack plots to create a glow effect
+    if line_widths is None:
+        line_widths = [6, 3, 1]
+    elif isinstance(line_widths, int):
+        line_widths = [line_widths]
+    if alphas is None:
+        alphas = [0.03, 0.08, 0.2]
+    elif isinstance(alphas, float):
+        alphas = [alphas]
+
+    if len(line_widths) != len(alphas):
+        raise ValueError("line_widths and alphas should be the same length.")
+
+    centroids = zones.centroid
     o = centroids.copy()
     o.index.name = "o"
     o.name = "geometry"
@@ -71,37 +109,10 @@ def plot_matrix(
         trunc_line.index.get_level_values(0) != trunc_line.index.get_level_values(1)
     ]
 
-    def left_curve(
-        geom: LineString, curve_ratio: float, n_points: int = 30
-    ) -> LineString:
-        coords = list(geom.coords)
-        if len(coords) < 2:
-            return geom
-        x0, y0 = coords[0]
-        x1, y1 = coords[-1]
-        dx = x1 - x0
-        dy = y1 - y0
-        chord = np.hypot(dx, dy)
-        if chord == 0:
-            return geom
-
-        nx = -dy / chord
-        ny = dx / chord
-        mx = 0.5 * (x0 + x1)
-        my = 0.5 * (y0 + y1)
-        cx = mx + nx * chord * curve_ratio
-        cy = my + ny * chord * curve_ratio
-
-        t = np.linspace(0, 1, n_points)
-        one_minus_t = 1 - t
-        xs = one_minus_t**2 * x0 + 2 * one_minus_t * t * cx + t**2 * x1
-        ys = one_minus_t**2 * y0 + 2 * one_minus_t * t * cy + t**2 * y1
-        return LineString(zip(xs, ys))
-
     inters_plot = inters.copy()
     if show_direction and not inters_plot.empty:
         inters_plot["geometry"] = inters_plot["geometry"].apply(
-            lambda g: left_curve(g, curve_left_ratio)
+            lambda g: _left_curve(g, curve_left_ratio)
         )
 
     # trunc_line: GeoDataFrame with 'geometry' (LineString) and 'trips' columns
@@ -146,6 +157,10 @@ def plot_matrix(
     ax.set_facecolor(tfn_constants.NAVY)
     ax.axis("off")
 
+    if bounds is not None:
+        ax.set_xlim(bounds[0], bounds[2])
+        ax.set_ylim(bounds[1], bounds[3])
+
     # Add geometry boundaries to plot
     zones.boundary.plot(ax=ax, color="#b0b8c0", linewidth=0.4, alpha=0.6, zorder=0)
 
@@ -154,7 +169,7 @@ def plot_matrix(
     NEG_COLOR = tfn_constants.ORANGE  # Or another contrasting color
 
     # Plot positive flows with glow effect
-    for lw, alpha in zip(lws, alphas):
+    for lw, alpha in zip(line_widths, alphas):
         if not pos_inters.empty:
             alpha_plot = alpha * np.sqrt(norm_pos(pos_inters["trips"]))
 
@@ -167,7 +182,7 @@ def plot_matrix(
                 rasterized=True,
             )
     # Plot negative flows with glow effect
-    for lw, alpha in zip(lws, alphas):
+    for lw, alpha in zip(line_widths, alphas):
         if not neg_inters.empty:
             alpha_plot = alpha * np.sqrt(norm_neg(abs(neg_inters["trips"])))
 
@@ -182,7 +197,7 @@ def plot_matrix(
 
     # Optionally, plot nodes (intras) split by sign
     if not pos_intras.empty:
-        for lw, alpha in zip(lws, alphas):
+        for lw, alpha in zip(line_widths, alphas):
             pos_intras.plot(
                 ax=ax,
                 color=POS_COLOR,
@@ -192,7 +207,7 @@ def plot_matrix(
                 rasterized=True,
             )
     if not neg_intras.empty:
-        for lw, alpha in zip(lws, alphas):
+        for lw, alpha in zip(line_widths, alphas):
             neg_intras.plot(
                 ax=ax,
                 color=NEG_COLOR,
@@ -390,55 +405,8 @@ def plot_matrix(
         )
         ax.add_artist(logo_artist)
 
-    if show:
-        plt.show()
     if output_path is not None:
         fig.savefig(
             output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300
         )
-    if return_fig:
-        return fig, ax
-    return None
-
-
-if __name__ == "__main__":
-    # Inputs to change for Caf.Viz
-    # Provide zone system nodes shape file
-    gdf = gpd.read_file(
-        r"G:\policy-explorer\CaS_Plots_Work\Updates 070826\MSOAs_no_Externals_centroids.shp"
-    )
-    # Provide node ID column name
-    gdf_id_col = "Area"
-    # Provide zone system shapefile
-    gdf_zone = gpd.read_file(
-        r"G:\policy-explorer\CaS_Plots_Work\Updates 070826\MSOAs_no_Externals.shp"
-    )
-
-    # Provide path to demand file
-    demand = pd.read_csv(
-        r"E:\Policy Builder\Demand Matrices\Demand HWY MSOAs NO Externals.csv"
-    )
-
-    # Provide location of logo image
-    logo = r"G:\policy-explorer\CaS_Plots_Work\tfn-logo.png"
-    # Provide a plot title
-    title = "Policy Builder HWY Demand (WYCA Area Only)"
-    # Provide a total title
-    total_title = "Total Demand (trips)"
-    # Provide a plot legend title
-    legend = "Demand (trips):"
-
-    # Provide output path
-    output_path_1 = r"E:\Policy Builder\Caf.Vis test\Updated 082026\plot_msoas_no_externals_with_total.pdf"
-
-    # Additional Inputs - SECTORIZED (Add if want to run otherwise set run_sectorised to 'No' in run_caf_vis_plot)
-    # Provide matrix to sectorized matrix lookup
-    # lookup = pd.read_csv(r"G:\policy-builder\inputs\Zoning\noham_3_8_to_noham_sector_v2_spatial.csv")
-    # Provide zone system nodes shape file SECTORIZED
-    # gdf_sector = gpd.read_file(r"G:\policy-builder\inputs\Zoning\NoHAM_sectors_v2\NoHAM_sector_system_V2_nodes_tfn.shp")
-    # Provide node ID column name SECTORIZED
-    # gdf_id_col_sector = "Code"
-    # Provide zone system shapefileSECTORIZED
-    # gdf_zone_sector = gpd.read_file(r"G:\policy-builder\inputs\Zoning\NoHAM_sectors_v2\NoHAM_sector_system_V2_tfn.shp")
-    # Provide output path
-    # output_path_2 = r"E:\Policy Builder\Caf.Vis test\plot_noham_3_8_sectors.pdf"
+    return fig, ax
