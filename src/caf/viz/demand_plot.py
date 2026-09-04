@@ -90,12 +90,12 @@ def plot_matrix(
 
     total_demand = matrix["trips"].abs().sum()
 
-    trunc_line = line_matrix[
+    trunc_line = line_matrix.loc[
         (line_matrix["trips"] > demand_threshold)
         | (line_matrix["trips"] < -demand_threshold)
-    ]
-    trunc_line["geometry"] = trunc_line["geometry_o"].combine(
-        trunc_line["geometry_d"], lambda p1, p2: LineString([p1, p2])
+    ].copy()
+    trunc_line.loc[:, "geometry"] = trunc_line.loc[:, "geometry_o"].combine(
+        trunc_line.loc[:, "geometry_d"], lambda p1, p2: LineString([p1, p2])
     )
     trunc_line = gpd.GeoDataFrame(trunc_line[["trips", "geometry"]])
     intras = trunc_line.loc[
@@ -287,52 +287,21 @@ def plot_matrix(
     idx = 0
 
     # --- Build legend values in correct order ---
-    legend_vals_pos = []
-    legend_vals_neg = []
-
-    if not pos_inters.empty:
-        legend_vals_pos = np.linspace(
-            pos_inters["trips"].min(), pos_inters["trips"].max(), 3
-        )
-
-    if not neg_inters.empty:
-        legend_vals_neg = np.linspace(
-            neg_inters["trips"].min(), neg_inters["trips"].max(), 3
-        )
-
-    # Combine: negatives first, then positives
-    legend_vals = list(legend_vals_neg) + list(legend_vals_pos)
+    legend_vals = [
+            f"Min Value {round_nice(inters['trips'].min())}",
+            f"Max Value {round_nice(inters['trips'].max())}"
+    ]
 
     # --- Plot legend ---
     idx = 0
     for val in legend_vals:
 
         y = y_base - y_step * idx
-        nice_val = round_nice(val)
-
-        if val >= 0:
-            color = POS_COLOR
-            alpha_val = norm_pos(val)
-            label = f"+{nice_val}"
-        else:
-            color = NEG_COLOR
-            alpha_val = np.sqrt(norm_neg(abs(val)))
-            label = f"{nice_val}"
-
-        ax.scatter(
-            [0.05],
-            [y],
-            s=40,
-            color=color,
-            alpha=alpha_val,
-            lw=0,
-            transform=ax.transAxes,
-        )
 
         ax.text(
             0.08,
             y,
-            label,
+            val,
             color="white",
             va="center",
             ha="left",
