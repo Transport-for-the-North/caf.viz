@@ -1,13 +1,14 @@
-import geopandas as gpd
-from shapely.geometry import LineString
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-import numpy as np
-from matplotlib.colors import Normalize, to_rgba
-from matplotlib.offsetbox import AnnotationBbox, OffsetImage
-from matplotlib.patches import FancyBboxPatch
 from pathlib import Path
+
+import geopandas as gpd
+import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.colors import Normalize
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
+from shapely.geometry import LineString
+
 from caf.viz import tfn_constants
 
 
@@ -60,6 +61,9 @@ def plot_matrix(
     total_title: str | None = None,
     line_widths: list[int] | int | None = None,
     alphas: list[float] | float | None = None,
+    source_text: str = "Source: Transport for the North",
+    positive_colour: str = tfn_constants.TEAL,
+    negative_colour: str = tfn_constants.ORANGE,
 ):
 
     # multiple line width and alphas to stack plots to create a glow effect
@@ -84,15 +88,12 @@ def plot_matrix(
     d.name = "geometry"
     matrix.columns = ["o", "d", "trips"]
     matrix = matrix.set_index(["o", "d"])
-    line_matrix = matrix.join(o, how="right").join(
-        d, rsuffix="_o", lsuffix="_d", how="right"
-    )
+    line_matrix = matrix.join(o, how="right").join(d, rsuffix="_o", lsuffix="_d", how="right")
 
     total_demand = matrix["trips"].abs().sum()
 
     trunc_line = line_matrix.loc[
-        (line_matrix["trips"] > demand_threshold)
-        | (line_matrix["trips"] < -demand_threshold)
+        (line_matrix["trips"] > demand_threshold) | (line_matrix["trips"] < -demand_threshold)
     ].copy()
     trunc_line.loc[:, "geometry"] = trunc_line.loc[:, "geometry_o"].combine(
         trunc_line.loc[:, "geometry_d"], lambda p1, p2: LineString([p1, p2])
@@ -124,34 +125,16 @@ def plot_matrix(
     # Robust normalisation using 95th percentile clipping
     # ------------------------------------------------------------------
 
-    all_pos = pd.concat(
+    all_inters = pd.concat(
         [
             pos_inters["trips"] if not pos_inters.empty else pd.Series(dtype=float),
-            pos_intras["trips"] if not pos_intras.empty else pd.Series(dtype=float),
+            (abs(neg_inters["trips"]) if not neg_inters.empty else pd.Series(dtype=float)),
         ]
     )
 
-    all_neg = pd.concat(
-        [
-            (
-                abs(neg_inters["trips"])
-                if not neg_inters.empty
-                else pd.Series(dtype=float)
-            ),
-            (
-                abs(neg_intras["trips"])
-                if not neg_intras.empty
-                else pd.Series(dtype=float)
-            ),
-        ]
-    )
+    vmax = np.percentile(all_inters, 99) if len(all_inters) else 1
 
-    vmax_pos = np.percentile(all_pos, 99) if len(all_pos) else 1
-    vmax_neg = np.percentile(all_neg, 99) if len(all_neg) else 1
-
-    norm_pos = Normalize(vmin=demand_threshold, vmax=vmax_pos, clip=True)
-
-    norm_neg = Normalize(vmin=demand_threshold, vmax=vmax_neg, clip=True)
+    norm = Normalize(vmin=demand_threshold, vmax=vmax, clip=True)
 
     fig, ax = plt.subplots(figsize=(8, 10), facecolor=tfn_constants.NAVY)
     ax.set_facecolor(tfn_constants.NAVY)
@@ -164,18 +147,14 @@ def plot_matrix(
     # Add geometry boundaries to plot
     zones.boundary.plot(ax=ax, color="#b0b8c0", linewidth=0.4, alpha=0.6, zorder=0)
 
-    # Colors for positive and negative flows
-    POS_COLOR = tfn_constants.TEAL
-    NEG_COLOR = tfn_constants.ORANGE  # Or another contrasting color
-
     # Plot positive flows with glow effect
     for lw, alpha in zip(line_widths, alphas):
         if not pos_inters.empty:
-            alpha_plot = alpha * np.sqrt(norm_pos(pos_inters["trips"]))
+            alpha_plot = alpha * np.sqrt(norm(pos_inters["trips"]))
 
             pos_inters.plot(
                 ax=ax,
-                color=POS_COLOR,
+                color=positive_colour,
                 alpha=alpha_plot,
                 linewidth=lw,
                 zorder=1,
@@ -184,11 +163,11 @@ def plot_matrix(
     # Plot negative flows with glow effect
     for lw, alpha in zip(line_widths, alphas):
         if not neg_inters.empty:
-            alpha_plot = alpha * np.sqrt(norm_neg(abs(neg_inters["trips"])))
+            alpha_plot = alpha * np.sqrt(norm(abs(neg_inters["trips"])))
 
             neg_inters.plot(
                 ax=ax,
-                color=NEG_COLOR,
+                color=negative_colour,
                 alpha=alpha_plot,
                 linewidth=lw,
                 zorder=1,
@@ -200,9 +179,9 @@ def plot_matrix(
         for lw, alpha in zip(line_widths, alphas):
             pos_intras.plot(
                 ax=ax,
-                color=POS_COLOR,
+                color=positive_colour,
                 markersize=lw / 2,
-                alpha=np.sqrt(norm_pos(pos_intras["trips"])) * alpha,
+                alpha=np.sqrt(norm(pos_intras["trips"])) * alpha,
                 zorder=2,
                 rasterized=True,
             )
@@ -210,9 +189,9 @@ def plot_matrix(
         for lw, alpha in zip(line_widths, alphas):
             neg_intras.plot(
                 ax=ax,
-                color=NEG_COLOR,
+                color=negative_colour,
                 markersize=lw / 2,
-                alpha=np.sqrt(norm_neg(abs(neg_intras["trips"]))) * alpha,
+                alpha=np.sqrt(norm(abs(neg_intras["trips"]))) * alpha,
                 zorder=2,
                 rasterized=True,
             )
@@ -271,8 +250,8 @@ def plot_matrix(
                     zorder=3,
                 )
 
-        add_half_arrows(pos_inters, POS_COLOR, norm_pos, is_negative=False)
-        add_half_arrows(neg_inters, NEG_COLOR, norm_neg, is_negative=True)
+        add_half_arrows(pos_inters, positive_colour, norm, is_negative=False)
+        add_half_arrows(neg_inters, negative_colour, norm, is_negative=True)
 
     # Add legend for demand (positive and negative)
     def round_nice(val):
@@ -287,21 +266,20 @@ def plot_matrix(
     idx = 0
 
     # --- Build legend values in correct order ---
-    legend_vals = [
-            f"Min Value {round_nice(inters['trips'].min())}",
-            f"Max Value {round_nice(inters['trips'].max())}"
-    ]
+    legend_vals = {"Min": inters["trips"].min(), "Max": inters["trips"].max()}
 
     # --- Plot legend ---
     idx = 0
-    for val in legend_vals:
-
+    for label, val in legend_vals.items():
         y = y_base - y_step * idx
 
+        colour = positive_colour if val > 0 else negative_colour
+        alpha = np.sqrt(norm(abs(val)))
+        ax.scatter([0.05], [y], s=40, color=colour, alpha=alpha, lw=0, transform=ax.transAxes)
         ax.text(
             0.08,
             y,
-            val,
+            f"{label} {round_nice(val)}",
             color="white",
             va="center",
             ha="left",
@@ -349,7 +327,7 @@ def plot_matrix(
     ax.text(
         1 - logo_pad,
         logo_pad - 0.02,
-        "Source: Transport for the North",
+        source_text,
         color="white",
         fontsize=9,
         ha="right",
@@ -375,7 +353,5 @@ def plot_matrix(
         ax.add_artist(logo_artist)
 
     if output_path is not None:
-        fig.savefig(
-            output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300
-        )
+        fig.savefig(output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300)
     return fig, ax
