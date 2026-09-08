@@ -43,7 +43,7 @@ def plot_matrix(
     matrix: pd.DataFrame,
     demand_threshold: float,
     *,
-    bounds: tuple(float, float, float, float) | None = None,
+    bounds: tuple[float, float, float, float] | None = None,
     show_direction: bool = False,
     curve_left_ratio: float = 0.08,
     direction_arrow_alpha: float = 0.8,
