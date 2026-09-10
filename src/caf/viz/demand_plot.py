@@ -354,4 +354,5 @@ def plot_matrix(
 
     if output_path is not None:
         fig.savefig(output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300)
+    plt.close(fig)
     return fig, ax
