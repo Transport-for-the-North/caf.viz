@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import geopandas as gpd
@@ -64,6 +65,7 @@ def plot_matrix(
     source_text: str = "Source: Transport for the North",
     positive_colour: str = tfn_constants.TEAL,
     negative_colour: str = tfn_constants.ORANGE,
+    unit: str = "",
 ):
 
     # multiple line width and alphas to stack plots to create a glow effect
@@ -266,24 +268,32 @@ def plot_matrix(
     idx = 0
 
     # --- Build legend values in correct order ---
-    legend_vals = {"Min": inters["trips"].min(), "Max": inters["trips"].max()}
+    legend_vals = {
+        "Min": 0 if math.isnan(inters["trips"].min()) else inters["trips"].min(),
+        "Max": 0 if math.isnan(inters["trips"].max()) else inters["trips"].max(),
+    }
 
     # --- Plot legend ---
     idx = 0
     for label, val in legend_vals.items():
         y = y_base - y_step * idx
+        if val > 0:
+            colour = positive_colour
+            prefix = "+"
+        else:
+            colour = negative_colour
+            prefix = ""
 
-        colour = positive_colour if val > 0 else negative_colour
         alpha = np.sqrt(norm(abs(val)))
         ax.scatter([0.05], [y], s=40, color=colour, alpha=alpha, lw=0, transform=ax.transAxes)
         ax.text(
             0.08,
             y,
-            f"{label} {round_nice(val)}",
+            f"{label} {prefix}{round_nice(val)} {unit}",
             color="white",
             va="center",
             ha="left",
-            fontsize=12,
+            fontsize=10,
             transform=ax.transAxes,
         )
 
@@ -316,7 +326,7 @@ def plot_matrix(
     ax.text(
         0.0005,
         0.7,
-        f"{total_title}:\n{total_demand:,.0f}",
+        f"{total_title}:\n{'+' if total_demand > 0 else ''}{total_demand:,.0f} {unit}",
         transform=ax.transAxes,
         fontsize=10,
         color="white",
