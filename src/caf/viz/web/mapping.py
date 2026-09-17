@@ -10,6 +10,7 @@ from typing import NamedTuple, Self
 
 import folium
 import geopandas as gpd
+import pandas as pd
 import tqdm
 from branca.element import Element, MacroElement, Template
 from shapely import geometry
@@ -87,6 +88,14 @@ HEAD = """
     .textbox-content {
         transition: all 0.3s ease;
     }
+    /* Continuous colorbar (Branca) */
+    .legend.leaflet-control:not(:empty) {
+        background: white;
+        padding: 8px 10px;
+        border: 1px solid #999;
+        border-radius: 4px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    }
     </style>
     {% endmacro %}
     """
@@ -116,17 +125,71 @@ class Bounds(NamedTuple):
 
 
 @dataclasses.dataclass
+class TooltipOptions:
+    """Options for folium tooltips."""
+
+    columns: list[str]
+    aliases: dict[str, str] | None = None
+    labels: bool = True
+    localize: bool = True
+
+    @property
+    def kwargs(self) -> dict:
+        """Get keyword arguments for :class:`folium.features.GeoJsonTooltip`."""
+        kwargs: dict[str, bool | list[str]] = {
+            "labels": self.labels,
+            "localize": self.localize,
+        }
+        if self.aliases is not None:
+            kwargs["aliases"] = [self.aliases.get(i, i) for i in self.columns]
+        return kwargs
+
+
+@dataclasses.dataclass
 class ExploreOptions:
     """Options for MapData."""
 
     show_legend: bool = True
-    tooltip: bool | list[str] = False
+    tooltip: bool | list[str] | TooltipOptions = False
     popup: bool | str | list[str] = False
     style: dict = dataclasses.field(default_factory=dict)
     highlight_style: dict = dataclasses.field(default_factory=dict)
     legend_title: str | None = None
     cmap: str | list[str] = "viridis"
     show: bool = True
+    categorical: bool | None = None
+    """Whether the legend should be categorical or not."""
+
+    def infer_categorical(self, data: pd.Series | None) -> bool:
+        """Infer categorical value if it isn't given.
+
+        Returns
+        -------
+        bool
+            - Attribute value if not None; or
+            - False if `data` is None or dtype of `data`
+              is numeric; or
+            - True for any other dtypes (including boolean).
+        """
+        if self.categorical is not None:
+            return self.categorical
+        if data is None:
+            return False
+
+        # is_numeric_dtype returns true for bool so checking that first
+        if pd.api.types.is_bool_dtype(data):
+            return True
+        return not pd.api.types.is_numeric_dtype(data)
+
+    def get_tooltip_options(self, data: gpd.GeoDataFrame) -> TooltipOptions:
+        """Get :class:`TooltipOptions` from given tooltip."""
+        if isinstance(self.tooltip, TooltipOptions):
+            return self.tooltip
+        if isinstance(self.tooltip, list):
+            return TooltipOptions(self.tooltip)
+        if self.tooltip:
+            return TooltipOptions([i for i in data.columns if i != data.geometry.name])
+        return TooltipOptions([])
 
 
 @dataclasses.dataclass()
@@ -162,13 +225,17 @@ def _explore(
     else:
         legend = {}
 
+    tooltip = options.get_tooltip_options(data)
     data.explore(
         data_column,
-        categorical=data_column is not None,
+        categorical=options.infer_categorical(
+            None if data_column is None else data[data_column]
+        ),
         cmap=options.cmap,
         legend=options.show_legend,
         m=map_,
-        tooltip=options.tooltip,
+        tooltip=tooltip.columns,
+        tooltip_kwds=tooltip.kwargs,
         popup=options.popup,
         tiles=None,
         name=name,
@@ -304,7 +371,7 @@ def map_datasets(
     folium.LayerControl(collapsed=False).add_to(map_)
 
     # Fit map to bounds of mask or last dataset
-    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.union_all().bounds)
+    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.total_bounds)
     map_.fit_bounds([[bounds.min_y, bounds.min_x], [bounds.max_y, bounds.max_x]])
 
     if output_path is None:
