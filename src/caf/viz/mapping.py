@@ -15,10 +15,11 @@ from typing import TYPE_CHECKING, Any, Self
 
 import contextily
 import mapclassify
+import matplotlib.legend as mpllegend
 import numpy as np
 import pandas as pd
 import requests
-from matplotlib import cm, patches
+from matplotlib import patches
 from matplotlib import pyplot as plt
 from shapely import geometry
 
@@ -29,6 +30,15 @@ if TYPE_CHECKING:
 
 ##### CONSTANTS #####
 LOG = logging.getLogger(__name__)
+
+_HEATMAP_PLOT_DEFAULTS: dict[str, Any] = dict(
+    cmap="viridis_r",
+    scheme="NaturalBreaks",
+    legend_kwds=dict(title_fontsize="large", fontsize="medium", loc="upper right"),
+    missing_kwds=dict(color="lightgrey", edgecolor="red", hatch="///", label="Missing values"),
+    linewidth=0.0,
+    edgecolor="black",
+)
 
 
 ##### CLASSES #####
@@ -74,7 +84,7 @@ class _LegendLabelValues:
 
 
 ##### FUNCTIONS #####
-def _extract_legend_values(text: str) -> _LegendLabelValues | None:
+def _extract_legend_values(text: str, fmt: str) -> _LegendLabelValues | None:
     """Extract numbers and formatted strings from legend label."""
     number = r"\d+(?:\.\d*)?"
     units = r"%?"
@@ -93,8 +103,8 @@ def _extract_legend_values(text: str) -> _LegendLabelValues | None:
     return _LegendLabelValues(
         lower=float(match.group("lower")),
         upper=float(match.group("upper")),
-        lower_formatted="{}{}".format(match.group("lower"), match.group("lower_units")),
-        upper_formatted="{}{}".format(match.group("upper"), match.group("upper_units")),
+        lower_formatted=f"{{}}{fmt}".format(match.group("lower"), match.group("lower_units")),
+        upper_formatted=f"{{}}{fmt}".format(match.group("upper"), match.group("upper_units")),
     )
 
 
@@ -132,7 +142,7 @@ def _colormap_classify(
 
     bin_categories = pd.Series(mc_bins.yb, index=finite.index)
 
-    cmap = cm.get_cmap(cmap_name, mc_bins.k)
+    cmap = plt.get_cmap(cmap_name, mc_bins.k)
     # Cmap produces incorrect results if given floats instead of int so
     # bin_categories can't contain Nans until after colours are calculated
     colours = pd.DataFrame(
@@ -246,17 +256,18 @@ def _add_poly_boundary(
     return legend_patch
 
 
-def heatmap_figure(
+def heatmap_figure(  # noqa: PLR0913
     geodata: gpd.GeoDataFrame,
     column_name: str,
     title: str,
+    *,
     bins: list[int | float] | None = None,
     n_bins: int = 5,
     polygon_boundary: geometry.Polygon | geometry.MultiPolygon = None,
     positive_negative_colormaps: bool = False,
-    legend_label_fmt: str = "{:.1%}",
-    legend_title: str | None = None,
+    legend_label_fmt: str = "{:.0f}",
     zoomed_bounds: Extent | None = None,
+    legend_kwds: dict[str, Any] | None = None,
     missing_kwds: dict[str, Any] | None = None,
     annotation: str | None = None,
 ) -> plt.Figure:
@@ -282,10 +293,11 @@ def heatmap_figure(
         If True colour use separate colour maps for positive and negative values.
     legend_label_fmt
         Number format for legend, default "{:.1%}".
-    legend_title
-        Optional legend title, `column_name` is used if not given.
     zoomed_bounds
         Optional bounding box to zoom to in a sub-plot.
+    legend_kwds
+        Keyword arguments for the adjusting the legend,
+        see :meth:`matplotlib.axes.Axes.legend`.
     missing_kwds
         Keyword arguments for styling any NaN values.
     annotation
@@ -297,8 +309,6 @@ def heatmap_figure(
         Figure with heatmap plotted, with 2 Axes if `zoomed_bounds`
         is given.
     """
-    legend_kwargs = dict(title_fontsize="large", fontsize="medium")
-
     ncols = 1 if zoomed_bounds is None else 2
 
     fig, axes = plt.subplots(
@@ -310,60 +320,26 @@ def heatmap_figure(
     fig.suptitle(title, fontsize="xx-large", backgroundcolor="white")
     for ax in axes:
         ax.set_aspect("equal")
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
-        ax.tick_params(length=0)
         ax.set_axis_off()
         if polygon_boundary is not None:
             _add_poly_boundary(ax, polygon_boundary)
     if polygon_boundary is not None:
-        axes[0].legend(**legend_kwargs, loc="upper right")
+        axes[0].legend(**_HEATMAP_PLOT_DEFAULTS["legend_kwds"])
 
-    kwargs = dict(
-        column=column_name,
-        cmap="viridis_r",
-        scheme="NaturalBreaks",
-        k=n_bins,
-        legend_kwds=dict(
-            title=legend_title or str(column_name).title(),
-            **legend_kwargs,
-            loc="upper right",
-        ),
-        missing_kwds={
-            "color": "lightgrey",
-            "edgecolor": "red",
-            "hatch": "///",
-            "label": "Missing values",
-        },
-        linewidth=0.0,
-        edgecolor="black",
-    )
+    kwargs = _HEATMAP_PLOT_DEFAULTS.copy()
+    kwargs["column"] = column_name
+    kwargs["k"] = n_bins
+    if legend_kwds is not None:
+        kwargs["legend_kwds"].update(legend_kwds)
+    if "title" not in kwargs["legend_kwds"]:
+        kwargs["legend_kwds"]["title"] = str(column_name).title()
 
     if missing_kwds is not None:
-        kwargs["missing_kwds"].update(missing_kwds)  # type: ignore[attr-defined]
+        assert isinstance(kwargs["missing_kwds"], dict)  # noqa: S101
+        kwargs["missing_kwds"].update(missing_kwds)
 
     if positive_negative_colormaps:
-        # Calculate, and apply, separate colormaps for positive and negative values
-        negative_cmap = _colormap_classify(
-            geodata.loc[geodata[column_name] <= 0, column_name],
-            "PuBu_r",
-            label_fmt=legend_label_fmt,
-            n_bins=n_bins,
-            bins=list(filter(lambda x: x <= 0, bins)) if bins is not None else bins,
-        )
-        positive_cmap = _colormap_classify(
-            geodata.loc[
-                (geodata[column_name] > 0) | (geodata[column_name].isna()), column_name
-            ],
-            "YlGn",
-            label_fmt=legend_label_fmt,
-            n_bins=n_bins,
-            bins=list(filter(lambda x: x > 0, bins)) if bins is not None else bins,
-            nan_colour=(1.0, 0.0, 0.0, 1.0),
-        )
-        cmap = negative_cmap + positive_cmap
-        # Update colours index to be the same order as geodata
-        cmap.colours = cmap.colours.reindex(geodata.index)
+        cmap = _positive_negative_cmap(geodata[column_name], bins, n_bins, legend_label_fmt)
 
         for ax in axes:
             geodata.plot(
@@ -375,59 +351,129 @@ def heatmap_figure(
             )
         axes[ncols - 1].legend(
             handles=cmap.legend_elements,
-            **kwargs.pop("legend_kwds"),  # type: ignore[arg-type]
+            **kwargs["legend_kwds"],  # type: ignore[arg-type]
         )
 
     else:
-        if bins:
-            kwargs["scheme"] = "UserDefined"
-            bins = sorted(bins)
-            max_ = np.max(geodata[column_name].values)
-            if bins[-1] < max_:
-                bins[-1] = math.ceil(max_)
-            kwargs["classification_kwds"] = {"bins": bins}
-            del kwargs["k"]
-
-        # If the quatiles scheme throws a warning then use FisherJenksSampled
-        with warnings.catch_warnings(action="error", category=UserWarning):
-            try:
-                geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
-                if zoomed_bounds is not None:
-                    geodata.plot(ax=axes[1], legend=True, **kwargs)
-            except UserWarning:
-                kwargs["scheme"] = "FisherJenksSampled"
-                geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
-                if zoomed_bounds is not None:
-                    geodata.plot(ax=axes[1], legend=True, **kwargs)
-
-        # Format legend text
-        legend = axes[ncols - 1].get_legend()
-        for label in legend.get_texts():
-            # Don't attempt to rename the label
-            # if it isn't in the expected format
-            values = _extract_legend_values(label.get_text())
-            if values is None:
-                continue
-
-            if values.lower == -np.inf:
-                label.set_text(f"< {values.upper_formatted}")
-            elif values.upper == np.inf:
-                label.set_text(f"> {values.lower_formatted}")
-            else:
-                label.set_text(f"{values.lower_formatted} - {values.upper_formatted}")
-
-    if zoomed_bounds is not None:
-        axes[1].set_xlim(zoomed_bounds.xmin, zoomed_bounds.xmax)
-        axes[1].set_ylim(zoomed_bounds.ymin, zoomed_bounds.ymax)
-
-    if annotation is not None:
-        axes[ncols - 1].annotate(
-            annotation,
-            xy=(0.9, 0.01),
-            xycoords="figure fraction",
-            bbox=dict(boxstyle="square", fc="white"),
+        _plot_heatmap(
+            axes,
+            geodata,
+            column_name,
+            legend_label_fmt=legend_label_fmt,
+            kwargs=kwargs,
+            bins=bins,
+            zoomed_bounds=zoomed_bounds,
         )
+
+    _set_limits(axes[1], zoomed_bounds)
+    _annotate(annotation, axes[ncols - 1])
     return fig
+
+
+def _annotate(annotation: str | None, ax: plt.Axes) -> None:
+    if annotation is None:
+        return
+    ax.annotate(
+        annotation,
+        xy=(0.9, 0.01),
+        xycoords="figure fraction",
+        bbox=dict(boxstyle="square", fc="white"),
+    )
+
+
+def _set_limits(ax: plt.Axes, bounds: Extent | None) -> None:
+    if bounds is None:
+        return
+    ax.set_xlim(bounds.xmin, bounds.xmax)
+    ax.set_ylim(bounds.ymin, bounds.ymax)
+
+
+def _plot_heatmap(
+    axes: list[plt.Axes],
+    geodata: gpd.GeoDataFrame,
+    column_name: str,
+    *,
+    legend_label_fmt: str,
+    kwargs: dict[str, Any],
+    bins: list[int | float] | None,
+    zoomed_bounds: Extent | None,
+) -> None:
+    if bins is not None:
+        kwargs["scheme"] = "UserDefined"
+        bins = sorted(bins)
+        max_ = np.max(geodata[column_name].values)
+        if bins[-1] < max_:
+            bins[-1] = math.ceil(max_)
+        kwargs["classification_kwds"] = {"bins": bins}
+        del kwargs["k"]
+
+    # If the quatiles scheme throws a warning then use FisherJenksSampled
+    with warnings.catch_warnings(action="error", category=UserWarning):
+        try:
+            geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
+            if zoomed_bounds is not None:
+                geodata.plot(ax=axes[1], legend=True, **kwargs)
+        except UserWarning:
+            kwargs["scheme"] = "FisherJenksSampled"
+            geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
+            if zoomed_bounds is not None:
+                geodata.plot(ax=axes[1], legend=True, **kwargs)
+
+    _format_legend_labels(axes[-1].get_legend(), legend_label_fmt)
+
+
+def _format_legend_labels(legend: mpllegend.Legend, fmt: str) -> None:
+    """Format legend labels to "< X", "> X" or "X - Y".
+
+    Expects labels in the legend to be in the format
+    "X, Y", any labels not in that format are unchanged.
+    """
+    if legend is None:
+        return
+
+    for label in legend.get_texts():
+        # Don't attempt to rename the label
+        # if it isn't in the expected format
+        values = _extract_legend_values(label.get_text(), fmt)
+        if values is None:
+            continue
+
+        if values.lower == -np.inf:
+            label.set_text(f"< {values.upper_formatted}")
+        elif values.upper == np.inf:
+            label.set_text(f"> {values.lower_formatted}")
+        else:
+            label.set_text(f"{values.lower_formatted} - {values.upper_formatted}")
+
+
+def _positive_negative_cmap(
+    values: pd.Series,
+    bins: list[int | float] | None,
+    n_bins: int,
+    legend_label_fmt: str,
+    cmaps: tuple[str, str] = ("PuBu_r", "YlGn"),
+    nan_colour: tuple[float, float, float, float] = (1.0, 0.0, 0.0, 1.0),
+) -> CustomCmap:
+    """Calculate, and apply, separate colormaps for positive and negative values."""
+    negative_cmap = _colormap_classify(
+        values.loc[values <= 0],
+        cmaps[0],
+        label_fmt=legend_label_fmt,
+        n_bins=n_bins,
+        bins=list(filter(lambda x: x <= 0, bins)) if bins is not None else bins,
+    )
+    positive_cmap = _colormap_classify(
+        values.loc[(values > 0) | (values.isna())],
+        cmaps[1],
+        label_fmt=legend_label_fmt,
+        n_bins=n_bins,
+        bins=list(filter(lambda x: x > 0, bins)) if bins is not None else bins,
+        nan_colour=nan_colour,
+    )
+    cmap = negative_cmap + positive_cmap
+    # Update colours index to be the same order as values
+    cmap.colours = cmap.colours.reindex(values.index)
+    return cmap
 
 
 def _get_basemap(

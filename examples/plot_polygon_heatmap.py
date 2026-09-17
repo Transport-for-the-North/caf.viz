@@ -89,3 +89,21 @@ fig = mapping.heatmap_figure(
     polygon_boundary=boundary,
     zoomed_bounds=mapping.Extent(*boundary.bounds),
 )
+
+# %%
+# Plot a heatmap with positive and negative values
+mask = rng.choice([-1, 1], size=len(geodata))
+if mask.min() == mask.max():
+    mask[: len(mask) // 2] = -1
+    mask[len(mask) // 2 :] = 1
+
+geodata["negatives"] = geodata["value"] * mask
+fig = mapping.heatmap_figure(
+    geodata,
+    "negatives",
+    "Example NUTS Zones with Positive and Negative Values",
+    n_bins=8,
+    polygon_boundary=boundary,
+    zoomed_bounds=mapping.Extent(*boundary.bounds),
+    positive_negative_colormaps=True,
+)
