@@ -2,7 +2,7 @@
 
 from matplotlib import pyplot as plt
 
-from caf.viz import tfn_constants
+from caf.viz import style
 from caf.viz.demand_plot import plot_matrix
 
 from ._version import __version__

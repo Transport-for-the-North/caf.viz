@@ -1,21 +1,25 @@
+"""Matrix plotting functionality."""
+import dataclasses
 import math
+from collections.abc import Callable
 from pathlib import Path
 
 import geopandas as gpd
-import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.colors import Normalize
-from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from shapely.geometry import LineString
 
-from caf.viz import tfn_constants
+from caf.viz import style
+
+MATRIX_PLOT_LINEWIDTHS: tuple[int, int, int] = (6, 3, 1)
+MATRIX_PLOT_ALPHAS: tuple[float, float, float] = (0.03, 0.08, 0.2)
 
 
 def _left_curve(geom: LineString, curve_ratio: float, n_points: int = 30) -> LineString:
     coords = list(geom.coords)
-    if len(coords) < 2:
+    if len(coords) < 2:  # noqa: PLR2004
         return geom
     x0, y0 = coords[0]
     x1, y1 = coords[-1]
@@ -36,50 +40,212 @@ def _left_curve(geom: LineString, curve_ratio: float, n_points: int = 30) -> Lin
     one_minus_t = 1 - t
     xs = one_minus_t**2 * x0 + 2 * one_minus_t * t * cx + t**2 * x1
     ys = one_minus_t**2 * y0 + 2 * one_minus_t * t * cy + t**2 * y1
-    return LineString(zip(xs, ys))
+    return LineString(zip(xs, ys, strict=True))
 
 
-def plot_matrix(
+def _add_half_arrows(
+    ax: plt.Axes,
+    gdf: gpd.GeoDataFrame,
+    color: str,
+    norm_fn: Callable,
+    *,
+    direction_min_normalized: float,
+    direction_arrow_span_ratio: float,
+    direction_arrow_offset_ratio: float,
+    direction_arrow_scale: float,
+    direction_arrow_alpha: float,
+    is_negative: bool = False,
+) -> plt.Axes:
+    if gdf.empty:
+        return ax
+
+    for _, row in gdf.iterrows():
+        geom = row["geometry"]
+        if geom is None or geom.is_empty:
+            continue
+
+        coords = np.array(geom.coords)
+        if len(coords) < 3:  # noqa: PLR2004
+            continue
+
+        trip_val = row["trips"]
+        if is_negative:
+            norm_val = np.sqrt(norm_fn(abs(trip_val)))
+        else:
+            norm_val = np.sqrt(norm_fn(trip_val))
+        if norm_val < direction_min_normalized:
+            continue
+
+        seg_idx = max(1, int(0.65 * (len(coords) - 1)))
+        p0 = coords[seg_idx - 1]
+        p1 = coords[seg_idx]
+        tangent = p1 - p0
+        t_len = np.hypot(tangent[0], tangent[1])
+        if t_len == 0:
+            continue
+        tangent = tangent / t_len
+        left = np.array([-tangent[1], tangent[0]])
+
+        geom_len = max(geom.length, t_len)
+        span = geom_len * direction_arrow_span_ratio
+        offset = geom_len * direction_arrow_offset_ratio
+
+        center = p1 + left * offset
+        tail = center - tangent * (0.5 * span)
+        head = center + tangent * (0.5 * span)
+
+        ax.annotate(
+            "",
+            xy=head,
+            xytext=tail,
+            arrowprops=dict(
+                arrowstyle="->",
+                color=color,
+                lw=1,
+                mutation_scale=direction_arrow_scale,
+                alpha=direction_arrow_alpha * norm_val,
+            ),
+            zorder=3,
+        )
+    return ax
+
+
+def _validate_line_settings(
+    line_widths: int | list[int] | None, alphas: list[float] | float | None
+) -> tuple[list[int], list[float]]:
+    if line_widths is None:
+        line_widths = list(MATRIX_PLOT_LINEWIDTHS)
+    elif isinstance(line_widths, int):
+        line_widths = [line_widths]
+    if alphas is None:
+        alphas = list(MATRIX_PLOT_ALPHAS)
+    elif isinstance(alphas, float):
+        alphas = [alphas]
+
+    if len(line_widths) != len(alphas):
+        raise ValueError("line_widths and alphas should be the same length.")
+    return line_widths, alphas
+
+
+def _plot_inters(
+    ax: plt.Axes,
+    inter_values: gpd.GeoDataFrame,
+    line_widths: list[int],
+    alphas: list[float],
+    normalisation_fn: Callable,
+    colour: str,
+) -> plt.Axes:
+    for lw, alpha in zip(line_widths, alphas, strict=True):
+        if not inter_values.empty:
+            alpha_plot = alpha * np.sqrt(normalisation_fn(inter_values["trips"]))
+
+            inter_values.plot(
+                ax=ax,
+                color=colour,
+                alpha=alpha_plot,
+                linewidth=lw,
+                zorder=1,
+                rasterized=True,
+            )
+    return ax
+
+
+def _plot_intras(
+    ax: plt.Axes,
+    intra_values: gpd.GeoDataFrame,
+    line_widths: list[int],
+    alphas: list[float],
+    normalisation_fn: Callable,
+    colour: str,
+) -> plt.Axes:
+    if not intra_values.empty:
+        for lw, alpha in zip(line_widths, alphas, strict=True):
+            intra_values.plot(
+                ax=ax,
+                color=colour,
+                markersize=lw / 2,
+                alpha=np.sqrt(normalisation_fn(intra_values["trips"])) * alpha,
+                zorder=2,
+                rasterized=True,
+            )
+    return ax
+
+
+@dataclasses.dataclass
+class DirectionInputs:
+    """Definition for parameters for directional matrix plotting."""
+
+    curve_left_ratio: float = 0.08
+    direction_arrow_alpha: float = 0.8
+    direction_arrow_scale: float = 9
+    direction_min_normalized: float = 0.15
+    direction_arrow_offset_ratio: float = 0.03
+    direction_arrow_span_ratio: float = 0.12
+
+
+def plot_matrix(  # noqa: PLR0913
     zones: gpd.GeoSeries,
     matrix: pd.DataFrame,
     demand_threshold: float,
     *,
     bounds: tuple[float, float, float, float] | None = None,
-    show_direction: bool = False,
-    curve_left_ratio: float = 0.08,
-    direction_arrow_alpha: float = 0.8,
-    direction_arrow_scale: float = 9,
-    direction_min_normalized: float = 0.15,
-    direction_arrow_offset_ratio: float = 0.03,
-    direction_arrow_span_ratio: float = 0.12,
-    logo_path: Path | None = None,
-    logo_zoom: float = 0.4,
-    logo_alpha: float = 1.0,
-    logo_pad: float = 0.02,
+    direction_inputs: DirectionInputs | None = None,
+    logo: style.LogoInput | None = None,
     output_path: Path | None = None,
     plot_title: str | None = None,
     legend_title: str | None = None,
     total_title: str | None = None,
     line_widths: list[int] | int | None = None,
     alphas: list[float] | float | None = None,
-    source_text: str = "Source: Transport for the North",
-    positive_colour: str = tfn_constants.TEAL,
-    negative_colour: str = tfn_constants.ORANGE,
+    annotation_text: str = "Source: Transport for the North",
+    positive_colour: str = style.TEAL,
+    negative_colour: str = style.ORANGE,
     unit: str = "",
-):
+) -> tuple[plt.Figure, plt.Axes]:
+    """Plot matrix values spatially as flow lines between zones.
 
+    Parameters
+    ----------
+    zones : gpd.GeoSeries
+        Zoning system of the Matrix. Indices should be zone IDs.
+    matrix : pd.DataFrame
+        Matrix in long format, with columns in the following order: origin zone ID, destination
+        zone ID, number of trips.
+    demand_threshold : float
+        Minimum number of trips required for a flow to be plotted.
+    bounds : tuple[float, float, float, float] | None, optional
+        Bounding box for the plot in the format (min x, min y, max x, max y).
+        If None, no bounding is used for the plot.
+    direction_inputs : DirectionInputs | None, optional
+        Inputs controlling the appearance of directional arrows and curves, by default None
+    logo : style.LogoInput | None, optional
+        Logo to be added to the plot, by default None
+    output_path : Path | None, optional
+        Path to save the plot, by default None
+    legend_title : str | None, optional
+        Title for the plot legend, by default None
+    total_title : str | None, optional
+        Title for the total demand annotation, by default None
+    line_widths : list[int] | int | None, optional
+        Line widths for the flow lines, by default None
+    alphas : list[float] | float | None, optional
+        Transparency levels for the flow lines, by default None
+    annotation_text : str, optional
+        Text for the plot annotation, by default "Source: Transport for the North"
+    positive_colour : str, optional
+        Colour for positive flows, by default style.TEAL
+    negative_colour : str, optional
+        Colour for negative flows, by default style.ORANGE
+    unit : str, optional
+        Unit of measurement for the flows, by default ""
+
+    Returns
+    -------
+    tuple[plt.Figure, plt.Axes]
+        Figure and axes of the generated plot.
+    """
     # multiple line width and alphas to stack plots to create a glow effect
-    if line_widths is None:
-        line_widths = [6, 3, 1]
-    elif isinstance(line_widths, int):
-        line_widths = [line_widths]
-    if alphas is None:
-        alphas = [0.03, 0.08, 0.2]
-    elif isinstance(alphas, float):
-        alphas = [alphas]
-
-    if len(line_widths) != len(alphas):
-        raise ValueError("line_widths and alphas should be the same length.")
+    line_widths, alphas = _validate_line_settings(line_widths, alphas)
 
     centroids = zones.centroid
     o = centroids.copy()
@@ -90,12 +256,15 @@ def plot_matrix(
     d.name = "geometry"
     matrix.columns = ["o", "d", "trips"]
     matrix = matrix.set_index(["o", "d"])
-    line_matrix = matrix.join(o, how="right").join(d, rsuffix="_o", lsuffix="_d", how="right")
+    line_matrix = matrix.join(o, how="right").join(
+        d, rsuffix="_o", lsuffix="_d", how="right"
+    )
 
     total_demand = matrix["trips"].abs().sum()
 
     trunc_line = line_matrix.loc[
-        (line_matrix["trips"] > demand_threshold) | (line_matrix["trips"] < -demand_threshold)
+        (line_matrix["trips"] > demand_threshold)
+        | (line_matrix["trips"] < -demand_threshold)
     ].copy()
     trunc_line.loc[:, "geometry"] = trunc_line.loc[:, "geometry_o"].combine(
         trunc_line.loc[:, "geometry_d"], lambda p1, p2: LineString([p1, p2])
@@ -113,9 +282,9 @@ def plot_matrix(
     ]
 
     inters_plot = inters.copy()
-    if show_direction and not inters_plot.empty:
+    if direction_inputs is not None and not inters_plot.empty:
         inters_plot["geometry"] = inters_plot["geometry"].apply(
-            lambda g: _left_curve(g, curve_left_ratio)
+            lambda g: _left_curve(g, direction_inputs.curve_left_ratio)
         )
 
     # trunc_line: GeoDataFrame with 'geometry' (LineString) and 'trips' columns
@@ -130,7 +299,11 @@ def plot_matrix(
     all_inters = pd.concat(
         [
             pos_inters["trips"] if not pos_inters.empty else pd.Series(dtype=float),
-            (abs(neg_inters["trips"]) if not neg_inters.empty else pd.Series(dtype=float)),
+            (
+                abs(neg_inters["trips"])
+                if not neg_inters.empty
+                else pd.Series(dtype=float)
+            ),
         ]
     )
 
@@ -138,8 +311,8 @@ def plot_matrix(
 
     norm = Normalize(vmin=demand_threshold, vmax=vmax, clip=True)
 
-    fig, ax = plt.subplots(figsize=(8, 10), facecolor=tfn_constants.NAVY)
-    ax.set_facecolor(tfn_constants.NAVY)
+    fig, ax = plt.subplots(figsize=(8, 10), facecolor=style.NAVY)
+    ax.set_facecolor(style.NAVY)
     ax.axis("off")
 
     if bounds is not None:
@@ -149,123 +322,70 @@ def plot_matrix(
     # Add geometry boundaries to plot
     zones.boundary.plot(ax=ax, color="#b0b8c0", linewidth=0.4, alpha=0.6, zorder=0)
 
-    # Plot positive flows with glow effect
-    for lw, alpha in zip(line_widths, alphas):
-        if not pos_inters.empty:
-            alpha_plot = alpha * np.sqrt(norm(pos_inters["trips"]))
+    _plot_inters(
+        ax,
+        pos_inters,
+        line_widths=line_widths,
+        alphas=alphas,
+        normalisation_fn=norm,
+        colour=positive_colour,
+    )
+    _plot_inters(
+        ax,
+        neg_inters,
+        line_widths=line_widths,
+        alphas=alphas,
+        normalisation_fn=norm,
+        colour=negative_colour,
+    )
+    _plot_intras(
+        ax,
+        neg_intras,
+        line_widths=line_widths,
+        alphas=alphas,
+        normalisation_fn=norm,
+        colour=negative_colour,
+    )
+    _plot_intras(
+        ax,
+        pos_intras,
+        line_widths=line_widths,
+        alphas=alphas,
+        normalisation_fn=norm,
+        colour=positive_colour,
+    )
 
-            pos_inters.plot(
-                ax=ax,
-                color=positive_colour,
-                alpha=alpha_plot,
-                linewidth=lw,
-                zorder=1,
-                rasterized=True,
-            )
-    # Plot negative flows with glow effect
-    for lw, alpha in zip(line_widths, alphas):
-        if not neg_inters.empty:
-            alpha_plot = alpha * np.sqrt(norm(abs(neg_inters["trips"])))
+    if direction_inputs is not None:
 
-            neg_inters.plot(
-                ax=ax,
-                color=negative_colour,
-                alpha=alpha_plot,
-                linewidth=lw,
-                zorder=1,
-                rasterized=True,
-            )
-
-    # Optionally, plot nodes (intras) split by sign
-    if not pos_intras.empty:
-        for lw, alpha in zip(line_widths, alphas):
-            pos_intras.plot(
-                ax=ax,
-                color=positive_colour,
-                markersize=lw / 2,
-                alpha=np.sqrt(norm(pos_intras["trips"])) * alpha,
-                zorder=2,
-                rasterized=True,
-            )
-    if not neg_intras.empty:
-        for lw, alpha in zip(line_widths, alphas):
-            neg_intras.plot(
-                ax=ax,
-                color=negative_colour,
-                markersize=lw / 2,
-                alpha=np.sqrt(norm(abs(neg_intras["trips"]))) * alpha,
-                zorder=2,
-                rasterized=True,
-            )
-    if show_direction:
-
-        def add_half_arrows(gdf, color, norm_fn, is_negative=False):
-            if gdf.empty:
-                return
-
-            for _, row in gdf.iterrows():
-                geom = row["geometry"]
-                if geom is None or geom.is_empty:
-                    continue
-
-                coords = np.array(geom.coords)
-                if len(coords) < 3:
-                    continue
-
-                trip_val = row["trips"]
-                if is_negative:
-                    norm_val = np.sqrt(norm_fn(abs(trip_val)))
-                else:
-                    norm_val = np.sqrt(norm_fn(trip_val))
-                if norm_val < direction_min_normalized:
-                    continue
-
-                seg_idx = max(1, int(0.65 * (len(coords) - 1)))
-                p0 = coords[seg_idx - 1]
-                p1 = coords[seg_idx]
-                tangent = p1 - p0
-                t_len = np.hypot(tangent[0], tangent[1])
-                if t_len == 0:
-                    continue
-                tangent = tangent / t_len
-                left = np.array([-tangent[1], tangent[0]])
-
-                geom_len = max(geom.length, t_len)
-                span = geom_len * direction_arrow_span_ratio
-                offset = geom_len * direction_arrow_offset_ratio
-
-                center = p1 + left * offset
-                tail = center - tangent * (0.5 * span)
-                head = center + tangent * (0.5 * span)
-
-                ax.annotate(
-                    "",
-                    xy=head,
-                    xytext=tail,
-                    arrowprops=dict(
-                        arrowstyle="->",
-                        color=color,
-                        lw=1,
-                        mutation_scale=direction_arrow_scale,
-                        alpha=direction_arrow_alpha * norm_val,
-                    ),
-                    zorder=3,
-                )
-
-        add_half_arrows(pos_inters, positive_colour, norm, is_negative=False)
-        add_half_arrows(neg_inters, negative_colour, norm, is_negative=True)
+        _add_half_arrows(
+            ax,
+            pos_inters,
+            positive_colour,
+            norm,
+            direction_min_normalized=direction_inputs.direction_min_normalized,
+            direction_arrow_span_ratio=direction_inputs.direction_arrow_span_ratio,
+            direction_arrow_offset_ratio=direction_inputs.direction_arrow_offset_ratio,
+            direction_arrow_scale=direction_inputs.direction_arrow_scale,
+            direction_arrow_alpha=direction_inputs.direction_arrow_alpha,
+            is_negative=False,
+        )
+        _add_half_arrows(
+            ax,
+            neg_inters,
+            negative_colour,
+            norm,
+            direction_min_normalized=direction_inputs.direction_min_normalized,
+            direction_arrow_span_ratio=direction_inputs.direction_arrow_span_ratio,
+            direction_arrow_offset_ratio=direction_inputs.direction_arrow_offset_ratio,
+            direction_arrow_scale=direction_inputs.direction_arrow_scale,
+            direction_arrow_alpha=direction_inputs.direction_arrow_alpha,
+            is_negative=True,
+        )
 
     # Add legend for demand (positive and negative)
-    def round_nice(val):
-        if val == 0:
-            return 0
-        exp = int(np.floor(np.log10(abs(val))))
-        base = np.round(val / 10**exp) * 10**exp
-        return int(base)
 
     y_base = 0.88
     y_step = 0.04
-    idx = 0
 
     # --- Build legend values in correct order ---
     legend_vals = {
@@ -274,9 +394,8 @@ def plot_matrix(
     }
 
     # --- Plot legend ---
-    idx = 0
-    for label, val in legend_vals.items():
-        y = y_base - y_step * idx
+    for i, (label, val) in enumerate(legend_vals.items()):
+        y = y_base - y_step * i
         if val > 0:
             colour = positive_colour
             prefix = "+"
@@ -285,19 +404,19 @@ def plot_matrix(
             prefix = ""
 
         alpha = np.sqrt(norm(abs(val)))
-        ax.scatter([0.05], [y], s=40, color=colour, alpha=alpha, lw=0, transform=ax.transAxes)
+        ax.scatter(
+            [0.05], [y], s=40, color=colour, alpha=alpha, lw=0, transform=ax.transAxes
+        )
         ax.text(
             0.08,
             y,
-            f"{label} {prefix}{round_nice(val)} {unit}",
+            f"{label} {prefix}{_round_nice(val)} {unit}",
             color="white",
             va="center",
             ha="left",
             fontsize=10,
             transform=ax.transAxes,
         )
-
-        idx += 1
 
     if legend_title is not None:
         ax.text(
@@ -321,7 +440,8 @@ def plot_matrix(
             pad=15,
             loc="center",
         )
-
+    if logo is not None:
+        ax = logo.add_logo(ax)
     # Add total absolute magnitude demand text box
     ax.text(
         0.0005,
@@ -335,9 +455,9 @@ def plot_matrix(
         zorder=20,
     )
     ax.text(
-        1 - logo_pad,
-        logo_pad - 0.02,
-        source_text,
+        1 - logo.logo_pad if logo is not None else 1,
+        logo.logo_pad - 0.02 if logo is not None else 0.02,
+        annotation_text,
         color="white",
         fontsize=9,
         ha="right",
@@ -346,23 +466,18 @@ def plot_matrix(
     )
 
     # Optionally add a PNG logo to the bottom-right corner.
-    if logo_path is not None:
-        logo_path = Path(logo_path)
-        if not logo_path.exists():
-            raise FileNotFoundError(f"logo_path does not exist: {logo_path}")
-        logo_img = mpimg.imread(logo_path)
-        logo_box = OffsetImage(logo_img, zoom=logo_zoom, alpha=logo_alpha)
-        logo_artist = AnnotationBbox(
-            logo_box,
-            (1 - logo_pad, logo_pad),
-            xycoords="axes fraction",
-            frameon=False,
-            box_alignment=(1, 0),
-            zorder=10,
-        )
-        ax.add_artist(logo_artist)
 
     if output_path is not None:
-        fig.savefig(output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300)
+        fig.savefig(
+            output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300
+        )
     plt.close(fig)
     return fig, ax
+
+
+def _round_nice(val: float) -> int:
+    if val == 0:
+        return 0
+    exp = int(np.floor(np.log10(abs(val))))
+    base = np.round(val / 10**exp) * 10**exp
+    return int(base)
