@@ -11,3 +11,5 @@ tqdm>=4.67.3
 branca>=0.8.2
 shapely>=2.1.2
 mapclassify>=2.10
+contextily>=1.7
+requests>=2.34
