@@ -255,6 +255,8 @@ def axes_plot_xy(
 
     Raises
     ------
+    KeyError
+        If any requested plot data columns aren't present in `data.data`.
     NotImplementedError
         For any plot types which haven't been implemented.
 
@@ -263,6 +265,14 @@ def axes_plot_xy(
     XYPlotType: for plot types which can be used.
     hexbin, scatter
     """
+    missing_columns = [
+        column for column in (data.x_column, data.y_column) if column not in data.data.columns
+    ]
+    if missing_columns:
+        column_label = "column" if len(missing_columns) == 1 else "columns"
+        missing = ", ".join(f"'{column}'" for column in missing_columns)
+        raise KeyError(f"plot data {column_label} not present: {missing}")
+
     if type_ == XYPlotType.HEXBIN:
         hexbin(fig, ax, data, cmap=cmap, **plot_kwargs)
 
