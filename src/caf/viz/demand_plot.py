@@ -24,18 +24,12 @@ def _left_curve(geom: LineString, curve_ratio: float, n_points: int = 30) -> Lin
         return geom
     x0, y0 = coords[0]
     x1, y1 = coords[-1]
-    dx = x1 - x0
-    dy = y1 - y0
-    chord = np.hypot(dx, dy)
+    chord = np.hypot(x1 - x0, y1 - y0)
     if chord == 0:
         return geom
 
-    nx = -dy / chord
-    ny = dx / chord
-    mx = 0.5 * (x0 + x1)
-    my = 0.5 * (y0 + y1)
-    cx = mx + nx * chord * curve_ratio
-    cy = my + ny * chord * curve_ratio
+    cx = 0.5 * (x0 + x1) + (-(y1 - y0) / chord) * chord * curve_ratio
+    cy = 0.5 * (y0 + y1) + ((x1 - x0) / chord) * chord * curve_ratio
 
     t = np.linspace(0, 1, n_points)
     one_minus_t = 1 - t
@@ -44,7 +38,7 @@ def _left_curve(geom: LineString, curve_ratio: float, n_points: int = 30) -> Lin
     return LineString(zip(xs, ys, strict=True))
 
 
-def _add_half_arrows(
+def _add_half_arrows(  # pylint: disable = too-many-locals
     ax: plt.Axes,
     gdf: gpd.GeoDataFrame,
     color: str,
@@ -131,6 +125,7 @@ def _validate_line_settings(
 def _plot_inters(
     ax: plt.Axes,
     inter_values: gpd.GeoDataFrame,
+    *,
     line_widths: list[int],
     alphas: list[float],
     normalisation_fn: Callable,
@@ -154,6 +149,7 @@ def _plot_inters(
 def _plot_intras(
     ax: plt.Axes,
     intra_values: gpd.GeoDataFrame,
+    *,
     line_widths: list[int],
     alphas: list[float],
     normalisation_fn: Callable,
@@ -184,7 +180,7 @@ class DirectionInputs:
     direction_arrow_span_ratio: float = 0.12
 
 
-def plot_matrix(  # noqa: PLR0913
+def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-arguments
     zones: gpd.GeoSeries,
     matrix: pd.DataFrame,
     demand_threshold: float,
