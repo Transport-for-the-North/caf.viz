@@ -1,4 +1,5 @@
 """Matrix plotting functionality."""
+
 import dataclasses
 import math
 from collections.abc import Callable
@@ -256,15 +257,12 @@ def plot_matrix(  # noqa: PLR0913
     d.name = "geometry"
     matrix.columns = ["o", "d", "trips"]
     matrix = matrix.set_index(["o", "d"])
-    line_matrix = matrix.join(o, how="right").join(
-        d, rsuffix="_o", lsuffix="_d", how="right"
-    )
+    line_matrix = matrix.join(o, how="right").join(d, rsuffix="_o", lsuffix="_d", how="right")
 
     total_demand = matrix["trips"].abs().sum()
 
     trunc_line = line_matrix.loc[
-        (line_matrix["trips"] > demand_threshold)
-        | (line_matrix["trips"] < -demand_threshold)
+        (line_matrix["trips"] > demand_threshold) | (line_matrix["trips"] < -demand_threshold)
     ].copy()
     trunc_line.loc[:, "geometry"] = trunc_line.loc[:, "geometry_o"].combine(
         trunc_line.loc[:, "geometry_d"], lambda p1, p2: LineString([p1, p2])
@@ -299,11 +297,7 @@ def plot_matrix(  # noqa: PLR0913
     all_inters = pd.concat(
         [
             pos_inters["trips"] if not pos_inters.empty else pd.Series(dtype=float),
-            (
-                abs(neg_inters["trips"])
-                if not neg_inters.empty
-                else pd.Series(dtype=float)
-            ),
+            (abs(neg_inters["trips"]) if not neg_inters.empty else pd.Series(dtype=float)),
         ]
     )
 
@@ -356,7 +350,6 @@ def plot_matrix(  # noqa: PLR0913
     )
 
     if direction_inputs is not None:
-
         _add_half_arrows(
             ax,
             pos_inters,
@@ -404,9 +397,7 @@ def plot_matrix(  # noqa: PLR0913
             prefix = ""
 
         alpha = np.sqrt(norm(abs(val)))
-        ax.scatter(
-            [0.05], [y], s=40, color=colour, alpha=alpha, lw=0, transform=ax.transAxes
-        )
+        ax.scatter([0.05], [y], s=40, color=colour, alpha=alpha, lw=0, transform=ax.transAxes)
         ax.text(
             0.08,
             y,
@@ -468,9 +459,7 @@ def plot_matrix(  # noqa: PLR0913
     # Optionally add a PNG logo to the bottom-right corner.
 
     if output_path is not None:
-        fig.savefig(
-            output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300
-        )
+        fig.savefig(output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300)
     plt.close(fig)
     return fig, ax
 
