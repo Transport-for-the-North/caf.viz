@@ -100,6 +100,12 @@ sphinx_gallery_conf = {
 # -- Options for Linking to external docs (intersphinx) ----------------------
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
+    "matplotlib": ("https://matplotlib.org/", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
+    "geopandas": ("https://geopandas.org/en/stable/", None),
+    "pydantic": ("https://docs.pydantic.dev/latest", None),
+    "caf.toolkit": ("https://caftoolkit.readthedocs.io/en/stable/", None),
+    "folium": ("https://python-visualization.github.io/folium/latest/", None),
 }
 intersphinx_timeout = 30
 

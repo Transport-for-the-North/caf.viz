@@ -2,18 +2,15 @@
 
 ##### IMPORTS #####
 
-# Built-Ins
 import logging
 import pathlib
 import re
-
-# Third Party
-from matplotlib.style import core
 
 ##### CONSTANTS #####
 
 LOG = logging.getLogger(__name__)
 _PACKAGE_PATH = pathlib.Path(__file__).parent
+_STYLE_SUFFIX = "mplstyle"
 
 ##### CLASSES & FUNCTIONS #####
 
@@ -38,7 +35,5 @@ def style_names() -> list[str]:
     >>> from matplotlib import pyplot as plt
     >>> plt.style.use("caf.viz.tfn")
     """
-    # MyPy false positive for missing function
-    styles = core.read_style_directory(_PACKAGE_PATH)  # type: ignore[attr-defined]
-
-    return list(styles)
+    styles = _PACKAGE_PATH.glob(f"**/*.{_STYLE_SUFFIX}")
+    return [i.stem for i in styles]
