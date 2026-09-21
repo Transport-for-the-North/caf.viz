@@ -11,7 +11,7 @@ import math
 import re
 import time
 import warnings
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
 import contextily
 import mapclassify
@@ -111,6 +111,7 @@ def _extract_legend_values(text: str, fmt: str) -> _LegendLabelValues | None:
 def _colormap_classify(
     data: pd.Series,
     cmap_name: str,
+    *,
     n_bins: int = 5,
     label_fmt: str = "{:.0f}",
     bins: list[int | float] | None = None,
@@ -256,7 +257,8 @@ def _add_poly_boundary(
     return legend_patch
 
 
-def heatmap_figure(  # noqa: PLR0913
+# TODO(MB): Group parameters into dataclasses for generic plotting options #50
+def heatmap_figure(  # noqa: PLR0913 pylint: disable=too-many-arguments,too-many-locals
     geodata: gpd.GeoDataFrame,
     column_name: str,
     title: str,
@@ -422,7 +424,7 @@ def _plot_heatmap(
     _format_legend_labels(axes[-1].get_legend(), legend_label_fmt)
 
 
-def _format_legend_labels(legend: mpllegend.Legend, fmt: str) -> None:
+def _format_legend_labels(legend: mpllegend.Legend | None, fmt: str) -> None:
     """Format legend labels to "< X", "> X" or "X - Y".
 
     Expects labels in the legend to be in the format
@@ -451,6 +453,7 @@ def _positive_negative_cmap(
     bins: list[int | float] | None,
     n_bins: int,
     legend_label_fmt: str,
+    *,
     cmaps: tuple[str, str] = ("PuBu_r", "YlGn"),
     nan_colour: tuple[float, float, float, float] = (1.0, 0.0, 0.0, 1.0),
 ) -> CustomCmap:
@@ -625,7 +628,7 @@ class LayerOptions:
     zorder: int = 0
     size: float | None = None
 
-    def __post_init__(self) -> Self:
+    def __post_init__(self) -> None:
         """Set edge and face color to color if given."""
         if self.color is not None:
             if self.edgecolor is not None or self.facecolor is not None:
@@ -634,7 +637,6 @@ class LayerOptions:
                 )
             self.edgecolor = self.color
             self.facecolor = self.color
-        return self
 
 
 @dataclasses.dataclass
