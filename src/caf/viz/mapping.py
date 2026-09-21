@@ -103,8 +103,12 @@ def _extract_legend_values(text: str, fmt: str) -> _LegendLabelValues | None:
     return _LegendLabelValues(
         lower=float(match.group("lower")),
         upper=float(match.group("upper")),
-        lower_formatted=f"{{}}{fmt}".format(match.group("lower"), match.group("lower_units")),
-        upper_formatted=f"{{}}{fmt}".format(match.group("upper"), match.group("upper_units")),
+        lower_formatted=f"{fmt}{{}}".format(
+            float(match.group("lower")), match.group("lower_units")
+        ),
+        upper_formatted=f"{fmt}{{}}".format(
+            float(match.group("upper")), match.group("upper_units")
+        ),
     )
 
 
@@ -367,7 +371,7 @@ def heatmap_figure(  # noqa: PLR0913 pylint: disable=too-many-arguments,too-many
             zoomed_bounds=zoomed_bounds,
         )
 
-    _set_limits(axes[1], zoomed_bounds)
+    _set_limits(axes[ncols - 1], zoomed_bounds)
     _annotate(annotation, axes[ncols - 1])
     return fig
 
