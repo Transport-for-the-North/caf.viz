@@ -451,6 +451,7 @@ def produce_map_set(
     datasets: dict[str, MapData],
     split: gpd.GeoDataFrame,
     split_name_column: str,
+    *,
     filter_zone_gpd: gpd.GeoDataFrame | None = None,
     tiles: str | xyzservices.TileProvider | folium.TileLayer | None = "OpenStreetMap",
 ) -> None:
