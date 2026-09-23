@@ -317,7 +317,7 @@ def plot_xy(
     type_: XYPlotType = XYPlotType.SCATTER,
     *,
     title: str | None = None,
-    weight_column: None | str | Sequence[str] = None,
+    weight_column: str | Sequence[str] | None = None,
 ) -> figure.Figure:
     """Create a graph of `data` based on given columns.
 
