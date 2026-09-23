@@ -308,7 +308,7 @@ def map_datasets(
         that directory.
         If None, the map object will be returned instead.
     tiles
-        Map tileset to use, can choose from:
+        Map tileset to use, defaults to "OpenStreetMap", can be one of:
 
         - Name of tiles from :mod:`xyzservices`,
         - a :class:`xyzservices.TileProvider`,
@@ -479,7 +479,7 @@ def produce_map_set(
     filter_zone_gpd
         GeoDataFrame or GeoSeries containing the geometry to filter the split geometries.
     tiles
-        Map tileset to use, can choose from:
+        Map tileset to use, defaults to "OpenStreetMap", can be one of:
 
         - Name of tiles from :mod:`xyzservices`,
         - a :class:`xyzservices.TileProvider`,
