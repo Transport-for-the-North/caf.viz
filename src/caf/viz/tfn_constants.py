@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on: 27/02/2023
 Updated on:
@@ -10,23 +9,22 @@ Other updates made by:
 File purpose:
 
 """
+
 # Built-Ins
+import os
 from pathlib import Path
 
 # Third Party
 import geopandas as gpd
-import numpy as np
-import contextily as cx
-from fiona import collection
-from caf.toolkit.config_base import BaseConfig
-from matplotlib import pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib.colors import LinearSegmentedColormap
-import os
-from pydantic import validator
-from adjustText import adjust_text
-import pandas as pd
 import matplotlib as mpl
+import matplotlib.patches as mpatches
+import pandas as pd
+from adjustText import adjust_text
+from caf.toolkit.config_base import BaseConfig
+from fiona import collection
+from matplotlib import pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+from pydantic import validator
 
 # Local Imports
 # pylint: disable=import-error,wrong-import-position
@@ -59,9 +57,7 @@ NIP = (GREEN, DARK_GREEN)
 tfn_boundary = Path(
     r"Y:\Data Strategy\GIS Shapefiles\TfN Boundary\Transport_for_the_north_boundary_2020_generalised.shp"
 )
-tfn_logo_large = Path(
-    r"C:\Users\IsaacScott\Projects\caf.viz\src\caf\TFN_logo.png"
-)
+tfn_logo_large = Path(r"C:\Users\IsaacScott\Projects\caf.viz\src\caf\TFN_logo.png")
 
 
 # # # CLASSES # # #
@@ -115,8 +111,7 @@ class Layer(BaseConfig):
                 schema = source.schema
                 if v not in schema["properties"].keys():
                     raise ValueError(
-                        f"The label provided, {v}, does not appear in the "
-                        f"chosen shapefile."
+                        f"The label provided, {v}, does not appear in the chosen shapefile."
                     )
         return v
 
@@ -173,14 +168,10 @@ class HeatmapLayer(Layer):
     @validator("colour_labels")
     def lengths_match(cls, v, values):
         if len(v) != len(values["colours"]):
-            raise ValueError(
-                "The lengths of 'colours' and 'colour_labels' must be the same."
-            )
+            raise ValueError("The lengths of 'colours' and 'colour_labels' must be the same.")
 
 
-def read_layer(
-    clip: bool, crs: str, path: Path, bound: gpd.GeoDataFrame
-):
+def read_layer(clip: bool, crs: str, path: Path, bound: gpd.GeoDataFrame):
     """
     Read in shapefile, sets the crs and clips to TfN boundary if asked for.
     """
@@ -263,9 +254,7 @@ def mono_plot(
         markersize=attributes.markersize,
     )
     if "Polygon" in layer.geom_type.to_list():
-        handle = mpatches.Patch(
-            color=attributes.colour, label=attributes.name
-        )
+        handle = mpatches.Patch(color=attributes.colour, label=attributes.name)
         custom_handles.append(handle)
     if attributes.label:
         texts = [
@@ -295,9 +284,7 @@ def cat_plot(
     handles to be added to a legend and texts to be added to the axis.
     """
     layer = read_layer(attributes.clip, crs, attributes.path, bound)
-    for i, j in zip(
-        layer[attributes.column].unique(), attributes.colours
-    ):
+    for i, j in zip(layer[attributes.column].unique(), attributes.colours):
         gdf = layer[layer[attributes.column] == i]
         gdf.plot(
             ax=ax,
@@ -345,9 +332,7 @@ def plotter(
     bound.plot(ax=ax, color=GREY)
     # cx.add_basemap(ax, source=cx.providers.OpenStreetMap.Mapnik, crs=crs)
     for attributes in heatmap_layers:
-        custom_handles = heatmap_plot(
-            attributes, crs, bound, custom_handles, ax, fig
-        )
+        custom_handles = heatmap_plot(attributes, crs, bound, custom_handles, ax, fig)
     for attributes in cat_layers:
         custom_handles, all_texts = cat_plot(
             attributes, crs, bound, custom_handles, ax, fig, all_texts
@@ -363,9 +348,7 @@ def plotter(
     else:
         legend = ax.legend(handles=custom_handles)
     bbox = legend.get_bbox_to_anchor().transformed(fig.transFigure)
-    all_texts.append(
-        (320000, 330000, "Contains OS data © Crown copyright 2022")
-    )
+    all_texts.append((320000, 330000, "Contains OS data © Crown copyright 2022"))
     final_texts = [ax.text(i[0], i[1], i[2]) for i in all_texts]
     adjust_text(final_texts, objects=[bbox])
     ax.axis("off")
@@ -411,9 +394,7 @@ if __name__ == "__main__":
     cities = MonoLayer(
         name="_nolegend_",
         label="City",
-        path=Path(
-            r"Y:\Data Strategy\GIS Shapefiles\STP Shapes\STP\STP\TfN Cities.shp"
-        ),
+        path=Path(r"Y:\Data Strategy\GIS Shapefiles\STP Shapes\STP\STP\TfN Cities.shp"),
         zorder=10,
         markersize=0,
         colour=GREY,
@@ -517,9 +498,7 @@ if __name__ == "__main__":
     )
     warehouses = HeatmapLayer(
         name="Warehouse Density",
-        path=Path(
-            r"Y:\Freight\13 Freight Analysis\NDR Business Floorspace\QGIS\LAD_NDR.shp"
-        ),
+        path=Path(r"Y:\Freight\13 Freight Analysis\NDR Business Floorspace\QGIS\LAD_NDR.shp"),
         colours=[YELLOW, DARK_GREEN],
         column="density",
         zorder=1,
