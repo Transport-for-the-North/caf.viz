@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from typing import NamedTuple, Self
 
 import folium
+import folium.template
 import geopandas as gpd
 import pandas as pd
 import tqdm
@@ -16,11 +17,14 @@ import xyzservices
 from branca.element import Element, MacroElement, Template
 from shapely import geometry
 
+import caf.viz as cviz
+
 ##### CONSTANTS #####
 
 LOG = logging.getLogger(__name__)
 
 MAP_CRS_EPSG = 4326
+LEAFLET_HEADER_PKG = "https://unpkg.com/leaflet-wms-header@1.0.13/index.js"
 
 # Textbox variables
 TITLE = "How to use the map"
@@ -264,6 +268,118 @@ def check_mask(mask: gpd.GeoDataFrame | gpd.GeoSeries) -> geometry.Polygon:
     return mask.union_all()
 
 
+class HeaderTileLayer(folium.TileLayer):
+    """Create a TileLayer with headers to add to a :class:`~folium.Map`.
+
+    This allows additional headers to be passed with the tile layer
+    request, which is required for OpenStreetMap, see
+    [comment on folium issue #2236](https://github.com/python-visualization/folium/issues/2236#issuecomment-5512902173)
+    for details.
+
+    Example
+    -------
+    OpenStreetMap expects the "X-Requested-With" header to pass information
+    about what is requesting the tiles, for :mod:`caf.viz` we provide the package
+    name and version.
+
+    >>> # doctest: +SKIP
+    >>> tiles = HeaderTileLayer("OpenStreetMap")
+    >>> tiles.add_header("X-Requested-With", f"{cviz.__package__} {cviz.__version__}")
+
+    Using this requires the leaflet-wms-header JavaScript package
+    (:const:`LEAFLET_HEADER_PKG`), this should be added to the :class:`~folium.Map'
+    instance with :meth:`~folium.Map.add_js_link`.
+
+    >>> # doctest: +SKIP
+    >>> map_ = folium.Map(tiles=tiles)
+    >>> map_.add_js_link("leaflet-wms-header", LEAFLET_HEADER_PKG)
+    """
+
+    _template = folium.template.Template(
+        """
+        {% macro script(this, kwargs) %}
+            var {{ this.get_name() }} = L.TileLayer.wmsHeader(
+                {{ this.tiles|tojson }},
+                {{ this.options|tojavascript }}
+                {%- if this.headers %},
+                [
+                {% for key, item in this.headers.items() -%}
+                  {header: {{ key|tojson }}, value: {{ item|tojson }}}
+                  {{- "," if not loop.last }}
+                {% endfor -%}
+                ]
+                {% endif %}
+            );
+        {% endmacro %}
+        """
+    )
+
+    def __init__(  # noqa: PLR0913, PLR0917 pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+        self,
+        tiles: str | xyzservices.TileProvider = "OpenStreetMap",
+        min_zoom: int | None = None,
+        max_zoom: int | None = None,
+        max_native_zoom: int | None = None,
+        attr: str | None = None,
+        detect_retina: bool = False,
+        name: str | None = None,
+        overlay: bool = False,
+        control: bool = True,
+        show: bool = True,
+        no_wrap: bool = False,
+        subdomains: str = "abc",
+        tms: bool = False,
+        opacity: float = 1,
+        headers: Mapping[str, str] | None = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            tiles,
+            min_zoom,
+            max_zoom,
+            max_native_zoom,
+            attr,
+            detect_retina,
+            name,
+            overlay,
+            control,
+            show,
+            no_wrap,
+            subdomains,
+            tms,
+            opacity,
+            **kwargs,
+        )
+        self.headers = None if headers is None else dict(headers)
+
+    @classmethod
+    def from_tile_layer(cls, tiles: folium.TileLayer) -> "HeaderTileLayer":
+        """Create a HeaderTileLayer from :class:`~folium.TileLayer`."""
+        return cls(
+            tiles=tiles.tiles,
+            min_zoom=tiles.options.get("min_zoom"),  # type: ignore[arg-type]
+            max_zoom=tiles.options.get("max_zoom"),  # type: ignore[arg-type]
+            max_native_zoom=tiles.options.get("max_native_zoom"),  # type: ignore[arg-type]
+            attr=tiles.options.get("attr"),  # type: ignore[arg-type]
+            detect_retina=tiles.options.get("detect_retina", False),  # type: ignore[arg-type]
+            name=tiles.options.get("name"),  # type: ignore[arg-type]
+            overlay=tiles.options.get("overlay", False),  # type: ignore[arg-type]
+            control=tiles.options.get("control", True),  # type: ignore[arg-type]
+            show=tiles.options.get("show", True),  # type: ignore[arg-type]
+            no_wrap=tiles.options.get("no_wrap", False),  # type: ignore[arg-type]
+            subdomains=tiles.options.get("subdomains", "abc"),  # type: ignore[arg-type]
+            tms=tiles.options.get("tms", "False"),  # type: ignore[arg-type]
+            opacity=tiles.options.get("opacity", 1),  # type: ignore[arg-type]
+        )
+
+    def add_header(self, key: str, value: str) -> None:
+        """Add a request header to the tile layer requests."""
+        if self.headers is None:
+            self.headers = {key: value}
+        else:
+            self.headers[key] = value
+
+
 def map_datasets(
     datasets: Mapping[str, MapData],
     mask: geometry.Polygon
@@ -275,7 +391,11 @@ def map_datasets(
     *,
     textbox_text: str = TEXT_NOSPLIT,
     output_path: pathlib.Path | None = None,
-    tiles: str | xyzservices.TileProvider | folium.TileLayer | None = "OpenStreetMap",
+    tiles: str
+    | xyzservices.TileProvider
+    | folium.TileLayer
+    | HeaderTileLayer
+    | None = "OpenStreetMap",
 ) -> pathlib.Path | folium.Map:
     """Produce single HTML map including all datasets.
 
@@ -313,7 +433,7 @@ def map_datasets(
         - Name of tiles from :mod:`xyzservices`,
         - a :class:`xyzservices.TileProvider`,
         - a custom URL,
-        - a :class:`folium.TileLayer`, or
+        - a :class:`folium.TileLayer` (or :class:`HeaderTileLayer`), or
         - None to create a map without tiles.
 
         See :class:`folium.Map` for more details.
@@ -329,7 +449,12 @@ def map_datasets(
     if mask is not None and not isinstance(mask, (geometry.Polygon, geometry.MultiPolygon)):
         mask = check_mask(mask)
 
+    tiles = _check_osm_tiles(tiles)
     map_ = folium.Map(tiles=tiles, prefer_canvas=True)
+
+    if isinstance(tiles, HeaderTileLayer):
+        # Required for OpenStreetMap X-Requested-With header
+        map_.add_js_link("leaflet-wms-header", LEAFLET_HEADER_PKG)
 
     if mask is not None:
         folium.GeoJson(
@@ -358,7 +483,39 @@ def map_datasets(
         _explore(map_, data, details.color_column, name, options=details.options)
         LOG.debug("Created %s layer with %s features", name, f"{len(data):,}")
 
-    # Add CSS (on Header)
+    _add_textbox(map_, textbox_text)
+    folium.LayerControl(collapsed=False).add_to(map_)
+
+    # Fit map to bounds of mask or last dataset
+    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.total_bounds)
+    map_.fit_bounds([[bounds.min_y, bounds.min_x], [bounds.max_y, bounds.max_x]])
+
+    if output_path is None:
+        return map_
+    map_.save(output_path)
+    LOG.debug("Written %s", output_path)
+    return output_path
+
+
+def _check_osm_tiles(
+    tiles: str | xyzservices.TileProvider | folium.TileLayer | HeaderTileLayer | None,
+) -> str | xyzservices.TileProvider | folium.TileLayer | HeaderTileLayer | None:
+    """Check if tiles are "OpenStreetMap" and add request header."""
+    header = "X-Requested-With"
+    value = f"{cviz.__package__} {cviz.__version__}"
+
+    if isinstance(tiles, str) and tiles.lower() == "openstreetmap":
+        tiles = HeaderTileLayer(tiles, headers={header: value})
+
+    elif isinstance(tiles, folium.TileLayer) and tiles.tiles.lower() == "openstreetmap":
+        tiles = HeaderTileLayer.from_tile_layer(tiles)
+        tiles.add_header(header, value)
+
+    return tiles
+
+
+def _add_textbox(map_: folium.Map, text: str) -> None:
+    """Add collapsible text box to the map."""
     macro = MacroElement()
     macro._template = Template(HEAD)  # pylint: disable=W0212
     map_.get_root().add_child(macro)
@@ -372,25 +529,12 @@ def map_datasets(
                     </button>
                 </div>
                 <div id="textbox-content" class="textbox-content">
-                    {textbox_text}
+                    {text}
                 </div>
             </div>"""
 
-    # Add body
     body = Element(body, "textbox")
     map_.get_root().html.add_child(body)  # type: ignore[attr-defined]
-
-    folium.LayerControl(collapsed=False).add_to(map_)
-
-    # Fit map to bounds of mask or last dataset
-    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.total_bounds)
-    map_.fit_bounds([[bounds.min_y, bounds.min_x], [bounds.max_y, bounds.max_x]])
-
-    if output_path is None:
-        return map_
-    map_.save(output_path)
-    LOG.debug("Written %s", output_path)
-    return output_path
 
 
 def _filter_data(
