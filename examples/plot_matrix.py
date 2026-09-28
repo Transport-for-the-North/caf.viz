@@ -32,6 +32,7 @@ demand_matrix = pd.DataFrame(
         "trips": rng.normal(scale=100, size=len(zones) ** 2),
     }
 )
+
 print(
     f"Generated random matrix ({len(demand_matrix):}, {len(demand_matrix.columns)})",
     f"with values from {demand_matrix['trips'].min():,.1f} - ",
@@ -44,7 +45,7 @@ print(
 fig, ax = cviz.plot_matrix(
     zones,
     demand_matrix.abs(),
-    matrix["trips"].quantile(0.95),
+    demand_matrix["trips"].quantile(0.95),
 )
 fig  # noqa: B018
 
@@ -53,7 +54,7 @@ fig  # noqa: B018
 fig, ax = cviz.plot_matrix(
     zones,
     demand_matrix,
-    matrix["trips"].quantile(0.95),
+    demand_matrix["trips"].quantile(0.95),
     plot_title="Negative and Positive Demand",
     legend_title="Legend",
 )

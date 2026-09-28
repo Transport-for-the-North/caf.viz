@@ -52,7 +52,6 @@ def _add_half_arrows(  # pylint: disable = too-many-locals
     norm_fn: Callable,
     *,
     direction: DirectionInputs,
-    is_negative: bool = False,
 ) -> plt.Axes:
     if gdf.empty:
         return ax
@@ -65,12 +64,8 @@ def _add_half_arrows(  # pylint: disable = too-many-locals
         coords = np.array(geom.coords)
         if len(coords) < 3:  # noqa: PLR2004
             continue
+        norm_val = np.sqrt(norm_fn(abs(row["trips"])))
 
-        trip_val = row["trips"]
-        if is_negative:
-            norm_val = np.sqrt(norm_fn(abs(trip_val)))
-        else:
-            norm_val = np.sqrt(norm_fn(trip_val))
         if norm_val < direction.min_normalized:
             continue
 
@@ -96,13 +91,13 @@ def _add_half_arrows(  # pylint: disable = too-many-locals
             "",
             xy=head,
             xytext=tail,
-            arrowprops=dict(
-                arrowstyle="->",
-                color=color,
-                lw=1,
-                mutation_scale=direction.arrow_scale,
-                alpha=direction.arrow_alpha * norm_val,
-            ),
+            arrowprops={
+                "arrowstyle": "->",
+                "color": color,
+                "lw": 1,
+                "mutation_scale": direction.arrow_scale,
+                "alpha": direction.arrow_alpha * norm_val,
+            },
             zorder=3,
         )
     return ax
@@ -176,10 +171,10 @@ class DirectionInputs:
     """Definition for parameters for directional matrix plotting."""
 
     curve_left_ratio: float = 0.08
-    arrow_alpha: float = 0.8
+    arrow_alpha: float = 0.4
     arrow_scale: float = 9
     min_normalized: float = 0.15
-    arrow_offset_ratio: float = 0.03
+    arrow_offset_ratio: float = 0
     arrow_span_ratio: float = 0.12
 
 
@@ -361,7 +356,6 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
             positive_colour,
             norm,
             direction=direction_inputs,
-            is_negative=False,
         )
         _add_half_arrows(
             ax,
@@ -369,7 +363,6 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
             negative_colour,
             norm,
             direction=direction_inputs,
-            is_negative=True,
         )
 
     # --- Build legend values in correct order ---
@@ -389,6 +382,7 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
             for i, j in legend_vals.items()
         ],
         title=legend_title,
+        loc="lower left",
     )
 
     # Add title and source
@@ -406,7 +400,7 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
     # Add total absolute magnitude demand text box
     ax.text(
         0.0005,
-        0.7,
+        0.85,
         _text_table({"Demand": total_demand}, title=total_title, unit=unit),
         transform=ax.transAxes,
         fontsize=10,
@@ -445,7 +439,7 @@ def _text_table(
         text.append(title)
     for label, value in values.items():
         if not isinstance(value, str):
-            text.append(f"{label:>{length}.{length}}: {value:{fmt}}{unit}")
+            text.append(f"{label:>{length}.{length}}: {value:{fmt}} {unit}")
         else:
             text.append(f"{label:>{length}.{length}}: {value}")
     return "\n".join(text)
