@@ -9,7 +9,6 @@ import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from matplotlib import offsetbox
 
-
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
 

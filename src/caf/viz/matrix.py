@@ -1,24 +1,31 @@
 """Matrix plotting functionality."""
 
+from __future__ import annotations
+
 import dataclasses
 import math
-from collections.abc import Callable
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.colors import Normalize
+from matplotlib.lines import Line2D
 from shapely.geometry import LineString
 
 from caf.viz import style
+
+if TYPE_CHECKING:
+    import pathlib
+    from collections.abc import Callable
 
 MATRIX_PLOT_LINEWIDTHS: tuple[int, int, int] = (6, 3, 1)
 MATRIX_PLOT_ALPHAS: tuple[float, float, float] = (0.03, 0.08, 0.2)
 
 
 def _left_curve(geom: LineString, curve_ratio: float, n_points: int = 30) -> LineString:
+    """Curves travel lines to the left, to help show direction."""
     coords = list(geom.coords)
     if len(coords) < 2:  # noqa: PLR2004
         return geom
@@ -44,11 +51,7 @@ def _add_half_arrows(  # pylint: disable = too-many-locals
     color: str,
     norm_fn: Callable,
     *,
-    direction_min_normalized: float,
-    direction_arrow_span_ratio: float,
-    direction_arrow_offset_ratio: float,
-    direction_arrow_scale: float,
-    direction_arrow_alpha: float,
+    direction: DirectionInputs,
     is_negative: bool = False,
 ) -> plt.Axes:
     if gdf.empty:
@@ -68,7 +71,7 @@ def _add_half_arrows(  # pylint: disable = too-many-locals
             norm_val = np.sqrt(norm_fn(abs(trip_val)))
         else:
             norm_val = np.sqrt(norm_fn(trip_val))
-        if norm_val < direction_min_normalized:
+        if norm_val < direction.min_normalized:
             continue
 
         seg_idx = max(1, int(0.65 * (len(coords) - 1)))
@@ -82,8 +85,8 @@ def _add_half_arrows(  # pylint: disable = too-many-locals
         left = np.array([-tangent[1], tangent[0]])
 
         geom_len = max(geom.length, t_len)
-        span = geom_len * direction_arrow_span_ratio
-        offset = geom_len * direction_arrow_offset_ratio
+        span = geom_len * direction.arrow_span_ratio
+        offset = geom_len * direction.arrow_offset_ratio
 
         center = p1 + left * offset
         tail = center - tangent * (0.5 * span)
@@ -97,8 +100,8 @@ def _add_half_arrows(  # pylint: disable = too-many-locals
                 arrowstyle="->",
                 color=color,
                 lw=1,
-                mutation_scale=direction_arrow_scale,
-                alpha=direction_arrow_alpha * norm_val,
+                mutation_scale=direction.arrow_scale,
+                alpha=direction.arrow_alpha * norm_val,
             ),
             zorder=3,
         )
@@ -173,11 +176,11 @@ class DirectionInputs:
     """Definition for parameters for directional matrix plotting."""
 
     curve_left_ratio: float = 0.08
-    direction_arrow_alpha: float = 0.8
-    direction_arrow_scale: float = 9
-    direction_min_normalized: float = 0.15
-    direction_arrow_offset_ratio: float = 0.03
-    direction_arrow_span_ratio: float = 0.12
+    arrow_alpha: float = 0.8
+    arrow_scale: float = 9
+    min_normalized: float = 0.15
+    arrow_offset_ratio: float = 0.03
+    arrow_span_ratio: float = 0.12
 
 
 # TODO(KF): fix too many locals and arguments when implementing new plot options classes #50
@@ -189,7 +192,7 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
     bounds: tuple[float, float, float, float] | None = None,
     direction_inputs: DirectionInputs | None = None,
     logo: style.LogoInput | None = None,
-    output_path: Path | None = None,
+    output_path: pathlib.Path | None = None,
     plot_title: str | None = None,
     legend_title: str | None = None,
     total_title: str | None = None,
@@ -218,7 +221,7 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
         Inputs controlling the appearance of directional arrows and curves, by default None
     logo : style.LogoInput | None, optional
         Logo to be added to the plot, by default None
-    output_path : Path | None, optional
+    output_path : pathlib.Path | None, optional
         Path to save the plot, by default None
     legend_title : str | None, optional
         Title for the plot legend, by default None
@@ -253,7 +256,12 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
     line_matrix = matrix.merge(
         centroids, left_on="o", right_index=True, how="right", validate="m:1"
     ).merge(
-        centroids, left_on="d", right_index=True, how="right", validate="m:1", suffixes=("_o", "_d")
+        centroids,
+        left_on="d",
+        right_index=True,
+        how="right",
+        validate="m:1",
+        suffixes=("_o", "_d"),
     )
 
     total_demand = matrix["trips"].abs().sum()
@@ -352,11 +360,7 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
             pos_inters,
             positive_colour,
             norm,
-            direction_min_normalized=direction_inputs.direction_min_normalized,
-            direction_arrow_span_ratio=direction_inputs.direction_arrow_span_ratio,
-            direction_arrow_offset_ratio=direction_inputs.direction_arrow_offset_ratio,
-            direction_arrow_scale=direction_inputs.direction_arrow_scale,
-            direction_arrow_alpha=direction_inputs.direction_arrow_alpha,
+            direction=direction_inputs,
             is_negative=False,
         )
         _add_half_arrows(
@@ -364,11 +368,7 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
             neg_inters,
             negative_colour,
             norm,
-            direction_min_normalized=direction_inputs.direction_min_normalized,
-            direction_arrow_span_ratio=direction_inputs.direction_arrow_span_ratio,
-            direction_arrow_offset_ratio=direction_inputs.direction_arrow_offset_ratio,
-            direction_arrow_scale=direction_inputs.direction_arrow_scale,
-            direction_arrow_alpha=direction_inputs.direction_arrow_alpha,
+            direction=direction_inputs,
             is_negative=True,
         )
 
@@ -380,7 +380,7 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
 
     ax.legend(
         handles=[
-            lines.Line2D(
+            Line2D(
                 [],
                 [],
                 color=negative_colour if j < 0 else positive_colour,
@@ -407,7 +407,7 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
     ax.text(
         0.0005,
         0.7,
-        f"{total_title}:\n{'+' if total_demand > 0 else ''}{total_demand:,.0f} {unit}",
+        _text_table({"Demand": total_demand}, title=total_title, unit=unit),
         transform=ax.transAxes,
         fontsize=10,
         color="white",
@@ -429,6 +429,26 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
     if output_path is not None:
         fig.savefig(output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300)
     return fig, ax
+
+
+def _text_table(
+    values: dict[str, float | int | str],
+    *,
+    title: str | None = None,
+    fmt: str = "+,.0f",
+    unit: str = "",
+) -> str:
+    """Format text as key value pairs, one per line."""
+    length = max(len(i) for i in values)
+    text = []
+    if title is not None:
+        text.append(title)
+    for label, value in values.items():
+        if not isinstance(value, str):
+            text.append(f"{label:>{length}.{length}}: {value:{fmt}}{unit}")
+        else:
+            text.append(f"{label:>{length}.{length}}: {value}")
+    return "\n".join(text)
 
 
 def _round_nice(val: float) -> int:

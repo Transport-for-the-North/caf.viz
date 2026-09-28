@@ -15,7 +15,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 import caf.viz as cviz
-from caf.viz import demand_plot
+from caf.viz import matrix
 
 # %%
 # Get Atlanta polygons from :mod:`geodatasets` to use as example zones.
@@ -25,7 +25,7 @@ print(f"Loaded dataset with {len(zones):,} rows and {len(zones.columns):,} colum
 # %%
 # Generate random matrix for plotting.
 rng = np.random.default_rng(103470)
-matrix = pd.DataFrame(
+demand_matrix = pd.DataFrame(
     {
         "o": np.repeat(zones.index, len(zones)),
         "d": np.tile(zones.index, len(zones)),
@@ -33,8 +33,9 @@ matrix = pd.DataFrame(
     }
 )
 print(
-    f"Generated random matrix ({len(matrix):}, {len(matrix.columns)})",
-    f"with values from {matrix['trips'].min():,.1f} - {matrix['trips'].max():,.1f}",
+    f"Generated random matrix ({len(demand_matrix):}, {len(demand_matrix.columns)})",
+    f"with values from {demand_matrix['trips'].min():,.1f} - ",
+    f"{demand_matrix['trips'].max():,.1f}",
 )
 
 # %%
@@ -42,7 +43,7 @@ print(
 # displaying (approximately) the largest 5% of values.
 fig, ax = cviz.plot_matrix(
     zones,
-    matrix.abs(),
+    demand_matrix.abs(),
     matrix["trips"].quantile(0.95),
 )
 fig  # noqa: B018
@@ -51,7 +52,7 @@ fig  # noqa: B018
 # Plot the matrix with positive and negative values.
 fig, ax = cviz.plot_matrix(
     zones,
-    matrix,
+    demand_matrix,
     matrix["trips"].quantile(0.95),
     plot_title="Negative and Positive Demand",
     legend_title="Legend",
@@ -63,9 +64,9 @@ fig  # noqa: B018
 # Plot the matrix with default direction arrows.
 fig, ax = cviz.plot_matrix(
     zones,
-    matrix,
-    matrix["trips"].quantile(0.95),
-    direction_inputs=demand_plot.DirectionInputs(),
+    demand_matrix,
+    demand_matrix["trips"].quantile(0.95),
+    direction_inputs=matrix.DirectionInputs(),
     plot_title="Random Matrix Plot with Directions",
 )
 fig  # noqa: B018
