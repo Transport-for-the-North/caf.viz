@@ -7,14 +7,8 @@ import pathlib
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
-from matplotlib.offsetbox import AnnotationBbox, OffsetImage
+from matplotlib import offsetbox
 
-# Third Party
-
-# Local Imports
-# pylint: disable=import-error,wrong-import-position
-# Local imports here
-# pylint: enable=import-error,wrong-import-position
 
 # # # CONSTANTS # # #
 LOG = logging.getLogger(__name__)
@@ -43,7 +37,7 @@ NIP = (GREEN, DARK_GREEN)
 
 @dataclasses.dataclass
 class LogoInput:
-    """Definition for parameters for to adding a logo to a plot."""
+    """Definition of parameters for adding a logo to a plot."""
 
     logo_path: pathlib.Path
     logo_zoom: float = 0.4
@@ -66,8 +60,8 @@ class LogoInput:
         if not self.logo_path.exists():
             raise FileNotFoundError(f"logo_path does not exist: {self.logo_path}")
         logo_img = mpimg.imread(self.logo_path)
-        logo_box = OffsetImage(logo_img, zoom=self.logo_zoom, alpha=self.logo_alpha)
-        logo_artist = AnnotationBbox(
+        logo_box = offsetbox.OffsetImage(logo_img, zoom=self.logo_zoom, alpha=self.logo_alpha)
+        logo_artist = offsetbox.AnnotationBbox(
             logo_box,
             (1 - self.logo_pad, self.logo_pad),
             xycoords="axes fraction",

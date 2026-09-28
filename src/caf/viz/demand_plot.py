@@ -128,12 +128,12 @@ def _plot_inters(
     *,
     line_widths: list[int],
     alphas: list[float],
-    normalisation_fn: Callable,
+    normalisation_fn: Callable[[pd.Series], pd.Series],
     colour: str,
 ) -> plt.Axes:
     for lw, alpha in zip(line_widths, alphas, strict=True):
         if not inter_values.empty:
-            alpha_plot = alpha * np.sqrt(normalisation_fn(inter_values["trips"]))
+            alpha_plot = alpha * np.sqrt(normalisation_fn(inter_values["trips"].abs()))
 
             inter_values.plot(
                 ax=ax,
@@ -161,7 +161,7 @@ def _plot_intras(
                 ax=ax,
                 color=colour,
                 markersize=lw / 2,
-                alpha=np.sqrt(normalisation_fn(intra_values["trips"])) * alpha,
+                alpha=np.sqrt(normalisation_fn(intra_values["trips"].abs())) * alpha,
                 zorder=2,
                 rasterized=True,
             )
@@ -180,6 +180,7 @@ class DirectionInputs:
     direction_arrow_span_ratio: float = 0.12
 
 
+# TODO(KF): fix too many locals and arguments when implementing new plot options classes #50
 def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-arguments
     zones: gpd.GeoSeries,
     matrix: pd.DataFrame,
@@ -244,16 +245,16 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
     # multiple line width and alphas to stack plots to create a glow effect
     line_widths, alphas = _validate_line_settings(line_widths, alphas)
 
-    centroids = zones.centroid
-    o = centroids.copy()
-    o.index.name = "o"
-    o.name = "geometry"
-    d = centroids.copy()
-    d.index.name = "d"
-    d.name = "geometry"
+    centroids = zones.centroid.copy()
+    centroids.name = "geometry"
+    matrix = matrix.copy()
     matrix.columns = ["o", "d", "trips"]
     matrix = matrix.set_index(["o", "d"])
-    line_matrix = matrix.join(o, how="right").join(d, rsuffix="_o", lsuffix="_d", how="right")
+    line_matrix = matrix.merge(
+        centroids, left_on="o", right_index=True, how="right", validate="m:1"
+    ).merge(
+        centroids, left_on="d", right_index=True, how="right", validate="m:1", suffixes=("_o", "_d")
+    )
 
     total_demand = matrix["trips"].abs().sum()
 
@@ -297,7 +298,7 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
         ]
     )
 
-    vmax = np.percentile(all_inters, 99) if len(all_inters) else 1
+    vmax = np.percentile(all_inters, 99) if len(all_inters) else None
 
     norm = Normalize(vmin=demand_threshold, vmax=vmax, clip=True)
 
@@ -371,51 +372,24 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
             is_negative=True,
         )
 
-    # Add legend for demand (positive and negative)
-
-    y_base = 0.88
-    y_step = 0.04
-
     # --- Build legend values in correct order ---
     legend_vals = {
         "Min": 0 if math.isnan(inters["trips"].min()) else inters["trips"].min(),
         "Max": 0 if math.isnan(inters["trips"].max()) else inters["trips"].max(),
     }
 
-    # --- Plot legend ---
-    for i, (label, val) in enumerate(legend_vals.items()):
-        y = y_base - y_step * i
-        if val > 0:
-            colour = positive_colour
-            prefix = "+"
-        else:
-            colour = negative_colour
-            prefix = ""
-
-        alpha = np.sqrt(norm(abs(val)))
-        ax.scatter([0.05], [y], s=40, color=colour, alpha=alpha, lw=0, transform=ax.transAxes)
-        ax.text(
-            0.08,
-            y,
-            f"{label} {prefix}{_round_nice(val)} {unit}",
-            color="white",
-            va="center",
-            ha="left",
-            fontsize=10,
-            transform=ax.transAxes,
-        )
-
-    if legend_title is not None:
-        ax.text(
-            0.0005,
-            y_base + y_step * 1.2,
-            legend_title,
-            color="white",
-            fontsize=11,
-            ha="left",
-            va="top",
-            transform=ax.transAxes,
-        )
+    ax.legend(
+        handles=[
+            lines.Line2D(
+                [],
+                [],
+                color=negative_colour if j < 0 else positive_colour,
+                label=f"{i} {_round_nice(j):+} {unit}",
+            )
+            for i, j in legend_vals.items()
+        ],
+        title=legend_title,
+    )
 
     # Add title and source
     if plot_title is not None:
@@ -452,11 +426,8 @@ def plot_matrix(  # noqa: PLR0913 #pylint: disable = too-many-locals, too-many-a
         transform=ax.transAxes,
     )
 
-    # Optionally add a PNG logo to the bottom-right corner.
-
     if output_path is not None:
         fig.savefig(output_path, bbox_inches="tight", facecolor=fig.get_facecolor(), dpi=300)
-    plt.close(fig)
     return fig, ax
 
 
