@@ -273,7 +273,7 @@ class HeaderTileLayer(folium.TileLayer):
 
     This allows additional headers to be passed with the tile layer
     request, which is required for OpenStreetMap, see
-    [comment on folium issue #2236](https://github.com/python-visualization/folium/issues/2236#issuecomment-5512902173)
+    `comment on folium issue #2236 <https://github.com/python-visualization/folium/issues/2236#issuecomment-5512902173>`__
     for details.
 
     Example
