@@ -12,6 +12,7 @@ import folium
 import geopandas as gpd
 import pandas as pd
 import tqdm
+import xyzservices
 from branca.element import Element, MacroElement, Template
 from shapely import geometry
 
@@ -271,8 +272,10 @@ def map_datasets(
     | gpd.GeoSeries
     | None = None,
     mask_name: str | None = None,
+    *,
     textbox_text: str = TEXT_NOSPLIT,
     output_path: pathlib.Path | None = None,
+    tiles: str | xyzservices.TileProvider | folium.TileLayer | None = "OpenStreetMap",
 ) -> pathlib.Path | folium.Map:
     """Produce single HTML map including all datasets.
 
@@ -282,29 +285,38 @@ def map_datasets(
 
     Parameters
     ----------
-    datasets : Mapping[str, MapData]
+    datasets
         Datasets must be provided as a dictionary of name to MapData.
         MapData includes the GeoDataFrame, an optional color column to plot, and extra options
-         for plotting (ExploreOptions).
-    mask : geometry.Polygon | geometry.MultiPolygon | gpd.GeoDataFrame | gpd.GeoSeries  | None,
-      optional
+        for plotting (ExploreOptions).
+    mask
         Mask to be used to filter data for mapping.
         Must be a single geometry object (Polygon or MultiPolygon) of the correct CRS
-          (EPSG:4326).
+        (EPSG:4326).
         If it is a GeoDataFrame/GeoSeries, it will be unioned to create the mask geometry and
-          CRS will be adjusted if necessary.
+        CRS will be adjusted if necessary.
         By default None.
-    mask_name : str | None, optional
+    mask_name
         Name of the mask (filtering) layer.
         By default None.
-    textbox_text : str, optional
+    textbox_text
         Text to go into the foldable textbox in bottom left of map.
         By default TEXT_NOSPLIT.
-    output_path : pathlib.Path | None, optional
+    output_path
         Output path to write the HTML map.
         If a directory is provided, the map will be written to a file called "Map.html" in
-          that directory.
+        that directory.
         If None, the map object will be returned instead.
+    tiles
+        Map tileset to use, defaults to "OpenStreetMap", can be one of:
+
+        - Name of tiles from :mod:`xyzservices`,
+        - a :class:`xyzservices.TileProvider`,
+        - a custom URL,
+        - a :class:`folium.TileLayer`, or
+        - None to create a map without tiles.
+
+        See :class:`folium.Map` for more details.
 
     Returns
     -------
@@ -317,7 +329,7 @@ def map_datasets(
     if mask is not None and not isinstance(mask, (geometry.Polygon, geometry.MultiPolygon)):
         mask = check_mask(mask)
 
-    map_ = folium.Map(tiles="OpenStreetMap", prefer_canvas=True)
+    map_ = folium.Map(tiles=tiles, prefer_canvas=True)
 
     if mask is not None:
         folium.GeoJson(
@@ -439,32 +451,44 @@ def produce_map_set(
     datasets: dict[str, MapData],
     split: gpd.GeoDataFrame,
     split_name_column: str,
+    *,
     filter_zone_gpd: gpd.GeoDataFrame | None = None,
+    tiles: str | xyzservices.TileProvider | folium.TileLayer | None = "OpenStreetMap",
 ) -> None:
     """Produce HTML maps for datasets, split into regions.
 
     A set of maps will be produced, one for each geometry in the split GeoDataFrame, filtered
-     to the filter_zone_gpd if provided.
+    to the filter_zone_gpd if provided.
     The initial overview map will include links to the split maps, which will be stored in a
-      separate folder.
+    separate folder.
     A textbox is included with instructions on how to use the map.
 
     Parameters
     ----------
-    output_path : pathlib.Path
+    output_path
         Output path to write the HTML map.
         If a directory is provided, the overview map will be written to a file called
-         "Overview Map.html" in that directory.
-    datasets : dict[str, MapData]
+        "Overview Map.html" in that directory.
+    datasets
         Datasets must be provided as a dictionary of name to MapData.
         MapData includes the GeoDataFrame, an optional color column to plot, and extra options
-         for plotting (ExploreOptions).
-    split : gpd.GeoDataFrame
+        for plotting (ExploreOptions).
+    split
         GeoDataFrame containing the geometries to split the map into.
-    split_name_column : str
+    split_name_column
         Name of the column containing the names of the split geometries.
-    filter_zone_gpd : gpd.GeoDataFrame | None, optional
+    filter_zone_gpd
         GeoDataFrame or GeoSeries containing the geometry to filter the split geometries.
+    tiles
+        Map tileset to use, defaults to "OpenStreetMap", can be one of:
+
+        - Name of tiles from :mod:`xyzservices`,
+        - a :class:`xyzservices.TileProvider`,
+        - a custom URL,
+        - a :class:`folium.TileLayer`, or
+        - None to create a map without tiles.
+
+        See :class:`folium.Map` for more details.
     """
     if output_path.is_dir():
         output_path = output_path / "Overview Map.html"
@@ -507,7 +531,7 @@ def produce_map_set(
             ),
         )
     }
-    map_datasets(overview_geom, textbox_text=TEXT_SPLIT, output_path=output_path)
+    map_datasets(overview_geom, textbox_text=TEXT_SPLIT, output_path=output_path, tiles=tiles)
 
     datasets = {
         "Subset Areas": MapData(
@@ -534,5 +558,6 @@ def produce_map_set(
             mask_name=map_name,
             textbox_text=TEXT_SPLIT,
             output_path=split_folder / f"{map_name}.html",
+            tiles=tiles,
         )
     LOG.info("Written %s maps to %s", len(split_geom), split_folder)

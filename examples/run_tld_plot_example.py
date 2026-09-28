@@ -56,4 +56,7 @@ ax = plot_tld(
     xlabel="Trip Length (km)",
     ylabel="Number of Trips",
 )
-plt.show()
+
+# %%
+# Explicitly close all figures once they are done with.
+plt.close("all")
