@@ -36,6 +36,9 @@ jobs:
         pip install -r requirements_dev.txt
 
     - name: Test with PyTest
+      env:
+        # Use the non-interactive (no GUI) backend
+        MPLBACKEND: agg
       run:
         pytest
 
