@@ -8,19 +8,18 @@ as a graph of flows between the zones.
 
 # %%
 
-import geodatasets
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
 import caf.viz as cviz
-from caf.viz import matrix
+from caf.viz import _datasets, matrix
 
 # %%
-# Get Atlanta polygons from :mod:`geodatasets` to use as example zones.
-zones = gpd.read_file(geodatasets.get_path("GeoDa Atlanta"))
-print(f"Loaded dataset with {len(zones):,} rows and {len(zones.columns):,} columns")
+# Get UK authority boundaries polygons to use as example zones.
+zones, attr = _datasets.fetch_dataset(_datasets.Datasets.ONS_UTLA)
+print(f"Loaded dataset with {len(zones):,} rows and {len(zones.columns):,} columns\n{attr}")
 
 # %%
 # Generate random matrix for plotting.
@@ -33,6 +32,22 @@ demand_matrix = pd.DataFrame(
     }
 )
 
+# %%
+# Use the approximate distance between the zones to scale the trips value.
+centroids = zones.centroid
+centroids.name = "centroid"
+
+demand_matrix = demand_matrix.merge(
+    centroids, left_on="o", right_index=True, validate="m:1"
+).merge(centroids, left_on="d", right_index=True, validate="m:1", suffixes=("-o", "-d"))
+demand_matrix["distance"] = gpd.GeoSeries(demand_matrix["centroid-o"]).distance(
+    demand_matrix["centroid-d"]
+)
+
+long = demand_matrix["distance"] > demand_matrix["distance"].quantile(0.1)
+demand_matrix.loc[long, "trips"] = demand_matrix.loc[long, "trips"] / 10
+
+demand_matrix = demand_matrix.drop(columns=["centroid-o", "centroid-d", "distance"])
 print(
     f"Generated random matrix ({len(demand_matrix):}, {len(demand_matrix.columns)})",
     f"with values from {demand_matrix['trips'].min():,.1f} - ",
@@ -41,7 +56,7 @@ print(
 
 # %%
 # Plot a matrix with only positive values using the default parameters and only
-# displaying (approximately) the largest 5% of values.
+# displaying (approximately) the largest 1% of values.
 fig, ax = cviz.plot_matrix(
     zones,
     demand_matrix.abs(),
@@ -66,7 +81,7 @@ fig  # noqa: B018
 fig, ax = cviz.plot_matrix(
     zones,
     demand_matrix,
-    demand_matrix["trips"].quantile(0.95),
+    demand_matrix["trips"].quantile(0.99),
     direction_inputs=matrix.DirectionInputs(),
     plot_title="Random Matrix Plot with Directions",
 )

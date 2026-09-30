@@ -8,19 +8,27 @@ Polygon heatmaps of spatial data.
 
 # %%
 # Import the :mod:`caf.viz.mapping` module and packages for generating / loading example data,
-# :mod:`geodatasets` is used to get example GeoSpatial data.
-import geodatasets
-import geopandas as gpd
+# private :mod:`caf.viz._datasets` module is used to get example GeoSpatial data.
 import numpy as np
 from shapely import geometry
 
-from caf.viz import mapping
+from caf.viz import _datasets, mapping
 
 # %%
-# Get European NUTS zones to use as example polygons.
-path = geodatasets.get_path("eurostat.nuts_rg_10m_2024_3035")
-geodata = gpd.read_file(path)
-print(f"Loaded dataset with {len(geodata):,} rows and {len(geodata.columns):,} columns")
+# Get UK Upper-tier/unitary authorities to use as example polygons.
+geodata, attr = _datasets.fetch_dataset(_datasets.Datasets.ONS_UTLA)
+YEAR = 2025
+mask = (geodata["start"].isna() | (geodata["start"] <= YEAR)) & (
+    geodata["end"].isna() | (geodata["end"] > YEAR)
+)
+geodata = geodata.loc[mask]
+print(
+    f"Loaded dataset with {len(geodata):,} rows and {len(geodata.columns):,} columns\n{attr}"
+)
+
+# %%
+# Convert to the British National Grid CRS for plotting.
+geodata = geodata.to_crs(27700)
 
 # %%
 # Insert column of random data for heatmap plotting.
@@ -32,18 +40,11 @@ print(
 )
 
 # %%
-# Clip data to mainland Europe for more zoomed in maps.
-clipped = geodata.clip_by_rect(2362632, 1386467, 5220063, 4744847)
-geodata = geodata.loc[clipped.index]
-geodata.geometry = clipped
-print(f"{len(geodata):,} features after clipping")
-
-# %%
 # Plot a heatmap with defined bin edges.
 fig = mapping.heatmap_figure(
     geodata,
     "value",
-    "Example NUTS Zones with Defined Bins",
+    "Example UK Authorities with Defined Bins",
     bins=[100, 500, 1000],
 )
 
@@ -52,7 +53,7 @@ fig = mapping.heatmap_figure(
 fig = mapping.heatmap_figure(
     geodata,
     "value",
-    "Example NUTS Zones with Generated Bins",
+    "Example UK Authorities with Generated Bins",
     n_bins=8,
 )
 
@@ -61,8 +62,8 @@ fig = mapping.heatmap_figure(
 fig = mapping.heatmap_figure(
     geodata,
     "value",
-    "Example NUTS Zones with Generated Bins & Zoomed Sub-Plot",
-    zoomed_bounds=mapping.Extent(4006001, 3024499, 4465735, 3866698),
+    "Example UK Authorities with Generated Bins & Zoomed Sub-Plot",
+    zoomed_bounds=mapping.Extent(297400, 347300, 541000, 658000),
     n_bins=8,
 )
 
@@ -70,21 +71,24 @@ fig = mapping.heatmap_figure(
 # Plot a heatmap with another Polygon as the boundary.
 boundary = geometry.Polygon(
     [
-        [3764449, 3208962],
-        [4226005, 2888032],
-        [4088719, 2632553],
-        [4185228, 2228950],
-        [3797698, 2172508],
-        [3520316, 2231879],
-        [3354327, 2369427],
-        [3134785, 2976605],
-        [3764449, 3208962],
+        [316231, 385575],
+        [320059, 459347],
+        [285117, 515784],
+        [313416, 563161],
+        [398241, 670853],
+        [426965, 632406],
+        [456268, 532029],
+        [495635, 513204],
+        [527752, 471537],
+        [549597, 407400],
+        [443887, 377371],
+        [341587, 366190],
     ]
 )
 fig = mapping.heatmap_figure(
     geodata,
     "value",
-    "Example NUTS Zones with a Polygon Boundary",
+    "Example UK Authorities with a Polygon Boundary",
     n_bins=8,
     polygon_boundary=boundary,
     zoomed_bounds=mapping.Extent(*boundary.bounds),
@@ -101,7 +105,7 @@ geodata["negatives"] = geodata["value"] * mask
 fig = mapping.heatmap_figure(
     geodata,
     "negatives",
-    "Example NUTS Zones with Positive and Negative Values",
+    "Example UK Authorities with Positive and Negative Values",
     n_bins=8,
     polygon_boundary=boundary,
     zoomed_bounds=mapping.Extent(*boundary.bounds),
