@@ -25,6 +25,11 @@ if errorlevel 9009 (
 
 if "%1" == "" goto help
 
+if "%1" == "clean" if exist "%SOURCEDIR%/_generated" (
+	echo Removing "%SOURCEDIR%/_generated"
+	rmdir /s "%SOURCEDIR%/_generated"
+)
+
 %SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 goto end
 

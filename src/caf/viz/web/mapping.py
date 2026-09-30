@@ -282,15 +282,13 @@ class HeaderTileLayer(folium.TileLayer):
     about what is requesting the tiles, for :mod:`caf.viz` we provide the package
     name and version.
 
-    >>> # doctest: +SKIP
     >>> tiles = HeaderTileLayer("OpenStreetMap")
     >>> tiles.add_header("X-Requested-With", f"{cviz.__package__} {cviz.__version__}")
 
     Using this requires the leaflet-wms-header JavaScript package
-    (:const:`LEAFLET_HEADER_PKG`), this should be added to the :class:`~folium.Map'
+    (:const:`LEAFLET_HEADER_PKG`), this should be added to the :class:`~folium.Map`
     instance with :meth:`~folium.Map.add_js_link`.
 
-    >>> # doctest: +SKIP
     >>> map_ = folium.Map(tiles=tiles)
     >>> map_.add_js_link("leaflet-wms-header", LEAFLET_HEADER_PKG)
     """
@@ -504,10 +502,12 @@ def _check_osm_tiles(
     header = "X-Requested-With"
     value = f"{cviz.__package__} {cviz.__version__}"
 
-    if isinstance(tiles, str) and tiles.lower() == "openstreetmap":
+    _osm_names = {"openstreetmap", "openstreetmap mapnik"}
+
+    if isinstance(tiles, str) and tiles.lower() in _osm_names:
         tiles = HeaderTileLayer(tiles, headers={header: value})
 
-    elif isinstance(tiles, folium.TileLayer) and tiles.tiles.lower() == "openstreetmap":
+    elif isinstance(tiles, folium.TileLayer) and tiles.tiles.lower() in _osm_names:
         tiles = HeaderTileLayer.from_tile_layer(tiles)
         tiles.add_header(header, value)
 
