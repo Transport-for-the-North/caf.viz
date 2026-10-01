@@ -35,7 +35,7 @@ geodata = geodata.to_crs(27700)
 rng = np.random.default_rng()
 geodata["value"] = np.abs(rng.normal(100, 50, size=len(geodata)))
 print(
-    f"Generated {len(geodata):,} random values for plotting,"
+    f"Generated {len(geodata):,} random values for plotting in the range"
     f" {geodata['value'].min():.1f} - {geodata['value'].max():.1f}"
 )
 

@@ -102,9 +102,9 @@ rng = np.random.default_rng()
 points["value"] = rng.random(len(points)) * 100
 
 # %%
-# Add the random points to the map datasets, there are lots of points which make
-# the map less clear, see :ref:`Create a Split Map`_ below for how to split the
-# map into sections to show more details.
+# Add the random points to the map datasets. Adding lots of data to a single
+# map can make them unclear and slow to load, see :ref:`Create a Split Map`
+# below for how to split the map into sections to show more details.
 mapping_datasets["Points"] = mapping.MapData(
     points.to_crs(epsg=mapping.MAP_CRS_EPSG),
     "value",

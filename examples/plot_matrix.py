@@ -22,6 +22,10 @@ zones, attr = _datasets.fetch_dataset(_datasets.Datasets.ONS_UTLA)
 print(f"Loaded dataset with {len(zones):,} rows and {len(zones.columns):,} columns\n{attr}")
 
 # %%
+# Convert CRS to British National Grid for plotting examples.
+zones = zones.to_crs(epsg=27700)
+
+# %%
 # Generate random matrix for plotting.
 rng = np.random.default_rng(103470)
 demand_matrix = pd.DataFrame(
@@ -62,7 +66,6 @@ fig, ax = cviz.plot_matrix(
     demand_matrix.abs(),
     demand_matrix["trips"].quantile(0.95),
 )
-fig  # noqa: B018
 
 # %%
 # Plot the matrix with positive and negative values.
@@ -73,8 +76,6 @@ fig, ax = cviz.plot_matrix(
     plot_title="Negative and Positive Demand",
     legend_title="Legend",
 )
-fig  # noqa: B018
-
 
 # %%
 # Plot the matrix with default direction arrows.
@@ -85,7 +86,6 @@ fig, ax = cviz.plot_matrix(
     direction_inputs=matrix.DirectionInputs(),
     plot_title="Random Matrix Plot with Directions",
 )
-fig  # noqa: B018
 
 # %%
 # Explicitly close all figures once they are done with.
