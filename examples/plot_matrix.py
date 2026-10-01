@@ -60,7 +60,7 @@ print(
 
 # %%
 # Plot a matrix with only positive values using the default parameters and only
-# displaying (approximately) the largest 1% of values.
+# displaying (approximately) the largest 5% of values.
 fig, ax = cviz.plot_matrix(
     zones,
     demand_matrix.abs(),
