@@ -10,9 +10,7 @@ This example shows two ways to create an interactive html map:
 - A split map consisting of an overview map with the split geometries which link to
   individual maps showing the datasets for each split geometry.
 
-The example uses the NUTS dataset from Eurostat and the cities dataset from Natural Earth,
-both of which are available in geodatasets.
-
+The example uses UK boundaries from Office National Statistics (ONS).
 """
 
 # %%
@@ -22,71 +20,98 @@ import os
 import pathlib
 
 import geopandas as gpd
-from geodatasets import get_path
+import numpy as np
+from shapely import geometry
 
+from caf.viz import _datasets
 from caf.viz.web import mapping
 
 # %%
-# Define constants
-# ----------------
-# These are constants used to select the desired data from the geodatasets package.
-COUNTRY_CODE = 0
-REGION_CODE = 3
+# Get data
+# --------
+# Load the UK Upper-tier/unitary authorities to use as example polygons.
+authorities, attr = _datasets.fetch_dataset(_datasets.Datasets.ONS_UTLA)
+YEAR = 2025
+mask = (authorities["start"].isna() | (authorities["start"] <= YEAR)) & (
+    authorities["end"].isna() | (authorities["end"] > YEAR)
+)
+authorities = authorities.loc[mask]
+print(
+    f"Loaded dataset with {len(authorities):,} rows and"
+    f" {len(authorities.columns):,} columns\n{attr}"
+)
 
 # %%
-# Load data
-# ---------
-# Load the datasets to be mapped as :class:`geopandas.GeoDataFrame` objects.
-path_to_data = get_path("eurostat.nuts_rg_10m_2024_3035")
-europe = gpd.read_file(path_to_data)
-
-path_to_data = get_path("naturalearth.cities")
-cities = gpd.read_file(path_to_data)
-
-europe_countries = europe[europe["LEVL_CODE"] == COUNTRY_CODE]
-
-# %%
-# Prepare datasets for mapping
-# ----------------------------
-# Prepare datasets for mapping as a :class:`~caf.viz.web.mapping.MapData` object, which
+# Prepare Dataset
+# ---------------
+# Prepare dataset for mapping as a :class:`~caf.viz.web.mapping.MapData` object, which
 # includes the data, the color column to use, and various mapping options in a
 # :class:`~caf.viz.web.mapping.ExploreOptions` object.
-datasets = {"Countries": europe_countries, "Cities": cities}
-
-color_column = {"Countries": None, "Cities": "natscale"}
-
-tooltip = {"Countries": ["NUTS_NAME", "NAME_ENGL", "CAPT"], "Cities": ["name", "natscale"]}
-
-options = {
-    "Countries": mapping.ExploreOptions(
-        tooltip=tooltip["Countries"],
-        show_legend=False,
-        style={"fillOpacity": 0.4, "fillColor": "grey", "color": "black"},
-    ),
-    "Cities": mapping.ExploreOptions(tooltip=tooltip["Cities"], show_legend=True),
+mapping_datasets = {
+    "Authorities": mapping.MapData(
+        data=authorities.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}"),
+        color_column="areacd",
+        options=mapping.ExploreOptions(tooltip=["areanm", "areacd"], show_legend=False),
+    )
 }
 
-mapping_datasets = {}
-for name, data in datasets.items():
-    mapping_datasets[name] = mapping.MapData(
-        data=data.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}"),
-        color_column=color_column[name],
-        options=options[name],
-    )
-
-# Prepare mask
-if europe_countries.crs != mapping.MAP_CRS_EPSG:
-    filter_zones = europe_countries.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")
-else:
-    filter_zones = europe_countries
-
 # %%
-# Create a Single Map
-# -------------------
+# Map a Single Layer
+# ------------------
 # :func:`~caf.viz.web.mapping.map_datasets` will create a :class:`folium.Map` object from the
 # datasets with OpenStreetMap background, it can be saved to a standalone HTML file
 # with :meth:`folium.Map.save`.
-mapping.map_datasets(datasets=mapping_datasets, mask=filter_zones, mask_name="Europe")
+mapping.map_datasets(datasets=mapping_datasets)
+
+# %%
+# Polygon Mask
+# ------------
+# Use a custom :class:`shapely.geometry.Polygon` (or another :class:`~geopandas.GeoDataFrame`)
+# to filter the map layer(s).
+boundary = geometry.Polygon(
+    [
+        [-3.260189, 53.360387],
+        [-3.221733, 54.023903],
+        [-3.776543, 54.524274],
+        [-3.353580, 54.955543],
+        [-2.029728, 55.930742],
+        [-1.573794, 55.584558],
+        [-1.128841, 54.680185],
+        [-0.524591, 54.505141],
+        [-0.046691, 54.123826],
+        [0.256121, 53.541937],
+        [-1.343080, 53.291492],
+        [-2.875676, 53.189576],
+    ]
+)
+mapping.map_datasets(mapping_datasets, mask=boundary, mask_name="North England")
+
+# %%
+# Multiple Layers
+# ---------------
+# Multiple datasets can be passed to :func:`~caf.viz.web.mapping.map_datasets` and they
+# will appear as separate layers in the map which can be toggled on and off.
+#
+# .. note::
+#   This example generates some random points for plotting.
+
+points = authorities.sample_points(20).explode().to_frame(name="geometry")
+points = points.join(authorities["areanm"])
+
+rng = np.random.default_rng()
+points["value"] = rng.random(len(points)) * 100
+
+# %%
+# Add the random points to the map datasets. Adding lots of data to a single
+# map can make them unclear and slow to load, see :ref:`Create a Split Map`
+# below for how to split the map into sections to show more details.
+mapping_datasets["Points"] = mapping.MapData(
+    points.to_crs(epsg=mapping.MAP_CRS_EPSG),
+    "value",
+    options=mapping.ExploreOptions(tooltip=["areanm", "value"]),
+)
+
+mapping.map_datasets(mapping_datasets)
 
 # %%
 # Create a Split Map
@@ -111,27 +136,12 @@ split_map_path.parent.mkdir(exist_ok=True, parents=True)
 # data is saved to the ``output_path``, the lower level HTML files with the more detailed
 # data are saved in a "Split Maps" sub-folder and linked to from the overview.
 
-europe_regions = europe[europe["LEVL_CODE"] == REGION_CODE]
-
-mapping_datasets = {
-    "Regions": mapping.MapData(
-        data=europe_regions.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}"),
-        color_column="NAME_ENGL",
-        options=mapping.ExploreOptions(
-            tooltip=["NUTS_NAME", "NAME_ENGL", "CAPT"],
-            show_legend=True,
-            style={"fillOpacity": 0.4, "fillColor": "grey", "color": "black"},
-        ),
-    )
-}
-
-# Check map crs for split geometries
-if europe_countries.crs != mapping.MAP_CRS_EPSG:
-    europe_countries = europe_countries.to_crs(f"EPSG:{mapping.MAP_CRS_EPSG}")
+mapping_datasets.pop("Authorities")
 
 mapping.produce_map_set(
     output_path=split_map_path,
     datasets=mapping_datasets,
-    split=europe_countries,
-    split_name_column="NAME_ENGL",
+    split=authorities,
+    split_name_column="areanm",
+    filter_zone_gpd=gpd.GeoSeries([boundary]).set_crs(epsg=4326),
 )
