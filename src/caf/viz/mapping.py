@@ -23,6 +23,8 @@ from matplotlib import patches
 from matplotlib import pyplot as plt
 from shapely import geometry
 
+import caf.viz as cviz
+
 if TYPE_CHECKING:
     import geopandas as gpd
     import xyzservices
@@ -483,6 +485,17 @@ def _positive_negative_cmap(
     return cmap
 
 
+def _osm_headers(source: xyzservices.TileProvider) -> dict[str, str] | None:
+    if source.name == "OpenStreetMap.Mapnik":
+        header = {
+            "User-Agent": f"{cviz.__package__}/{cviz.__version__}"
+            " (https://github.com/Transport-for-the-North/caf.viz)"
+        }
+        LOG.debug("Adding headers %s for %s tiles", header, source.name)
+        return header
+    return None
+
+
 def _get_basemap(
     ax: plt.Axes,
     source: xyzservices.TileProvider,
@@ -519,7 +532,9 @@ def _get_basemap(
     count = 0
     while True:
         try:
-            return contextily.bounds2img(xmin, ymin, xmax, ymax, source=source)
+            return contextily.bounds2img(
+                xmin, ymin, xmax, ymax, source=source, headers=_osm_headers(source)
+            )
         except requests.exceptions.ConnectionError as exc:
             if count >= max_retries:
                 exc.add_note(f"max retries ({max_retries}) reached")
@@ -672,7 +687,7 @@ def simple_map(
     plt.Figure
         Figure containing a single axes with plotted data.
     """
-    fig, ax = plt.subplots(1, figsize=(15, 10), layout="compressed", frameon=False)
+    fig, ax = plt.subplots(1, layout="compressed", frameon=False)
     ax.set_axis_off()
 
     for name, layer in layers.items():
@@ -685,8 +700,8 @@ def simple_map(
             edgecolor=layer.ops.edgecolor,
             facecolor=layer.ops.facecolor,
             zorder=layer.ops.zorder,
-            markersize=None if layer.ops.size is None else layer.ops.size,
-            linewidth=None if layer.ops.size is None else layer.ops.size,
+            markersize=layer.ops.size,
+            linewidth=layer.ops.size,
         )
 
     ax.legend(title=legend_title)
