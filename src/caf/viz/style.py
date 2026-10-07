@@ -33,6 +33,27 @@ MRN = (PURPLE, GREY)
 FREIGHT = (YELLOW, DARK_GREEN)
 NIP = (GREEN, DARK_GREEN)
 
+_PACKAGE_PATH = pathlib.Path(__file__).parent
+_STYLE_SUFFIX = "mplstyle"
+
+
+def style_names() -> list[str]:
+    """List current matplotlib styles available in CAF.viz.
+
+    Examples
+    --------
+    Listing all available caf.viz styles.
+    >>> from caf.viz import utils
+    >>> utils.style_names()
+    ['tfn']
+
+    Using the TfN style.
+    >>> from matplotlib import pyplot as plt
+    >>> plt.style.use("caf.viz.tfn")
+    """
+    styles = _PACKAGE_PATH.glob(f"**/*.{_STYLE_SUFFIX}")
+    return [i.stem for i in styles]
+
 
 @dataclasses.dataclass
 class LogoInput:
