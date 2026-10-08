@@ -84,7 +84,7 @@ class Bounds:
             ymax=max(self.ymax, value.ymax),
         )
 
-    def as_tuple(self) -> tuple[float, float, float, float]:
+    def as_tuple(self) -> tuple[int | float, int | float, int | float, int | float]:
         """Convert to tuple in format (xmin, ymin, xmax, ymax)."""
         return (self.xmin, self.ymin, self.xmax, self.ymax)
 
@@ -717,7 +717,7 @@ def simple_map(
     for name, layer in layers.items():
         data = layer.data.to_crs(epsg=3857)
         if extent is not None:
-            data = data.clip_by_rect(extent.as_tuple())
+            data = data.clip_by_rect(*extent.as_tuple())
         data.plot(
             ax=ax,
             label=name,
