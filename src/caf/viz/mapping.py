@@ -331,13 +331,11 @@ def heatmap_figure(  # noqa: PLR0913 pylint: disable=too-many-arguments,too-many
     """
     ncols = 1 if zoomed_bounds is None else 2
 
-    fig, axes = plt.subplots(
-        1, ncols, figsize=(20, 15), frameon=False, constrained_layout=True
-    )
+    fig, axes = plt.subplots(1, ncols, frameon=False, constrained_layout=True)
     if ncols == 1:
         axes: list[plt.Axes] = [axes]  # type: ignore[no-redef]
 
-    fig.suptitle(title, fontsize="xx-large", backgroundcolor="white")
+    fig.suptitle(title)
     for ax in axes:
         ax.set_aspect("equal")
         ax.set_axis_off()
@@ -428,16 +426,16 @@ def _plot_heatmap(
         del kwargs["k"]
 
     # If the quatiles scheme throws a warning then use FisherJenksSampled
-    with warnings.catch_warnings(action="error", category=UserWarning):
-        try:
+    try:
+        with warnings.catch_warnings(action="error", category=UserWarning):
             geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
             if zoomed_bounds is not None:
                 geodata.plot(ax=axes[1], legend=True, **kwargs)
-        except UserWarning:
-            kwargs["scheme"] = "FisherJenksSampled"
-            geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
-            if zoomed_bounds is not None:
-                geodata.plot(ax=axes[1], legend=True, **kwargs)
+    except UserWarning:
+        kwargs["scheme"] = "FisherJenksSampled"
+        geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
+        if zoomed_bounds is not None:
+            geodata.plot(ax=axes[1], legend=True, **kwargs)
 
     _format_legend_labels(axes[-1].get_legend(), legend_label_fmt)
 
