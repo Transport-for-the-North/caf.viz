@@ -63,7 +63,7 @@ fig = mapping.heatmap_figure(
     geodata,
     "value",
     "Example UK Authorities with Generated Bins & Zoomed Sub-Plot",
-    zoomed_bounds=mapping.Extent(297400, 347300, 541000, 658000),
+    zoomed_bounds=mapping.Bounds(297400, 347300, 541000, 658000),
     n_bins=8,
 )
 
@@ -91,7 +91,7 @@ fig = mapping.heatmap_figure(
     "Example UK Authorities with a Polygon Boundary",
     n_bins=8,
     polygon_boundary=boundary,
-    zoomed_bounds=mapping.Extent(*boundary.bounds),
+    zoomed_bounds=mapping.Bounds(*boundary.bounds),
 )
 
 # %%
@@ -108,6 +108,6 @@ fig = mapping.heatmap_figure(
     "Example UK Authorities with Positive and Negative Values",
     n_bins=8,
     polygon_boundary=boundary,
-    zoomed_bounds=mapping.Extent(*boundary.bounds),
+    zoomed_bounds=mapping.Bounds(*boundary.bounds),
     positive_negative_colormaps=True,
 )

@@ -6,7 +6,6 @@ import pathlib
 import re
 import warnings
 from collections.abc import Mapping
-from typing import NamedTuple, Self
 
 import folium
 import folium.template
@@ -18,6 +17,7 @@ from branca.element import Element, MacroElement, Template
 from shapely import geometry
 
 import caf.viz as cviz
+from caf.viz import mapping
 
 ##### CONSTANTS #####
 
@@ -106,27 +106,6 @@ HEAD = """
     """
 
 ##### CLASSES & FUNCTIONS #####
-
-
-class Bounds(NamedTuple):
-    """Bounding box coordinates."""
-
-    min_x: int | float
-    min_y: int | float
-    max_x: int | float
-    max_y: int | float
-
-    def __add__(self, value: object) -> Self:
-        """Create a bounding box which contain both."""
-        if not isinstance(value, self.__class__):
-            raise TypeError(f"value should be {self.__class__} not {type(value)}")
-
-        return self.__class__(
-            min_x=min(self.min_x, value.min_x),
-            min_y=min(self.min_y, value.min_y),
-            max_x=max(self.max_x, value.max_x),
-            max_y=max(self.max_y, value.max_y),
-        )
 
 
 @dataclasses.dataclass
@@ -485,8 +464,8 @@ def map_datasets(
     folium.LayerControl(collapsed=False).add_to(map_)
 
     # Fit map to bounds of mask or last dataset
-    bounds = Bounds(*mask.bounds) if mask else Bounds(*data.total_bounds)
-    map_.fit_bounds([[bounds.min_y, bounds.min_x], [bounds.max_y, bounds.max_x]])
+    bounds = mapping.Bounds(*mask.bounds) if mask else mapping.Bounds(*data.total_bounds)
+    map_.fit_bounds([[bounds.ymin, bounds.xmin], [bounds.ymax, bounds.xmax]])
 
     if output_path is None:
         return map_

@@ -11,7 +11,7 @@ import math
 import re
 import time
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import contextily
 import mapclassify
@@ -64,13 +64,25 @@ class CustomCmap:
 
 
 @dataclasses.dataclass
-class Extent:
-    """Bounding box / extent for a map."""
+class Bounds:
+    """Bounding box coordinates."""
 
-    xmin: float
-    ymin: float
-    xmax: float
-    ymax: float
+    xmin: int | float
+    ymin: int | float
+    xmax: int | float
+    ymax: int | float
+
+    def __add__(self, value: object) -> Self:
+        """Create a bounding box which contain both."""
+        if not isinstance(value, self.__class__):
+            raise TypeError(f"value should be {self.__class__} not {type(value)}")
+
+        return self.__class__(
+            xmin=min(self.xmin, value.xmin),
+            ymin=min(self.ymin, value.ymin),
+            xmax=max(self.xmax, value.xmax),
+            ymax=max(self.ymax, value.ymax),
+        )
 
     def as_tuple(self) -> tuple[float, float, float, float]:
         """Convert to tuple in format (xmin, ymin, xmax, ymax)."""
@@ -274,7 +286,7 @@ def heatmap_figure(  # noqa: PLR0913 pylint: disable=too-many-arguments,too-many
     polygon_boundary: geometry.Polygon | geometry.MultiPolygon = None,
     positive_negative_colormaps: bool = False,
     legend_label_fmt: str = "{:.0f}",
-    zoomed_bounds: Extent | None = None,
+    zoomed_bounds: Bounds | None = None,
     legend_kwds: dict[str, Any] | None = None,
     missing_kwds: dict[str, Any] | None = None,
     annotation: str | None = None,
@@ -389,7 +401,7 @@ def _annotate(annotation: str | None, ax: plt.Axes) -> None:
     )
 
 
-def _set_limits(ax: plt.Axes, bounds: Extent | None) -> None:
+def _set_limits(ax: plt.Axes, bounds: Bounds | None) -> None:
     if bounds is None:
         return
     ax.set_xlim(bounds.xmin, bounds.xmax)
@@ -404,7 +416,7 @@ def _plot_heatmap(
     legend_label_fmt: str,
     kwargs: dict[str, Any],
     bins: list[int | float] | None,
-    zoomed_bounds: Extent | None,
+    zoomed_bounds: Bounds | None,
 ) -> None:
     if bins is not None:
         kwargs["scheme"] = "UserDefined"
@@ -657,6 +669,18 @@ class LayerOptions:
             self.edgecolor = self.color
             self.facecolor = self.color
 
+    def to_style(self) -> dict[str, str | float]:
+        """Output to style dictionary for :class:`~caf.viz.web.ExploreOptions`."""
+        style: dict[str, str | float] = {}
+        if self.edgecolor is not None:
+            style["color"] = "" if self.edgecolor == "none" else self.edgecolor
+        if self.facecolor is not None:
+            style["fillColor"] = "" if self.facecolor == "none" else self.facecolor
+        if self.size is not None:
+            style["weight"] = self.size
+            style["markersize"] = self.size
+        return style
+
 
 @dataclasses.dataclass
 class LayerData:
@@ -669,7 +693,7 @@ class LayerData:
 def simple_map(
     layers: dict[str, LayerData],
     legend_title: str,
-    extent: Extent | None = None,
+    extent: Bounds | None = None,
 ) -> plt.Figure:
     """Plot GeoSpatial data on a map with a grayscale background.
 
