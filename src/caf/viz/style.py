@@ -43,8 +43,8 @@ def style_names() -> list[str]:
     Examples
     --------
     Listing all available caf.viz styles.
->>> from caf.viz import style
->>> style.style_names()
+    >>> from caf.viz import style
+    >>> style.style_names()
     ['tfn']
 
     Using the TfN style.
