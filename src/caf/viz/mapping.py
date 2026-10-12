@@ -34,13 +34,18 @@ if TYPE_CHECKING:
 ##### CONSTANTS #####
 LOG = logging.getLogger(__name__)
 
-_HEATMAP_PLOT_DEFAULTS: dict[str, Any] = dict(
-    scheme="NaturalBreaks",
-    legend_kwds=dict(title_fontsize="large", fontsize="medium", loc="upper right"),
-    missing_kwds=dict(color="lightgrey", edgecolor="red", hatch="///", label="Missing values"),
-    linewidth=0.0,
-    edgecolor="black",
-)
+
+def _heatmap_plot_defaults() -> dict[str, Any]:
+    """Factory to create default heatmap kwargs."""  # noqa: D401
+    return dict(
+        scheme="NaturalBreaks",
+        legend_kwds=dict(title_fontsize="large", fontsize="medium", loc="upper right"),
+        missing_kwds=dict(
+            color="lightgrey", edgecolor="red", hatch="///", label="Missing values"
+        ),
+        linewidth=0.0,
+        edgecolor="black",
+    )
 
 
 ##### CLASSES #####
@@ -335,6 +340,8 @@ def heatmap_figure(  # noqa: PLR0913 pylint: disable=too-many-arguments,too-many
     if ncols == 1:
         axes: list[plt.Axes] = [axes]  # type: ignore[no-redef]
 
+    kwargs = _heatmap_plot_defaults()
+
     fig.suptitle(title)
     for ax in axes:
         ax.set_aspect("equal")
@@ -342,9 +349,8 @@ def heatmap_figure(  # noqa: PLR0913 pylint: disable=too-many-arguments,too-many
         if polygon_boundary is not None:
             _add_poly_boundary(ax, polygon_boundary)
     if polygon_boundary is not None:
-        axes[0].legend(**_HEATMAP_PLOT_DEFAULTS["legend_kwds"])
+        axes[0].legend(**kwargs["legend_kwds"])
 
-    kwargs = _HEATMAP_PLOT_DEFAULTS.copy()
     kwargs["cmap"] = mpl.rcParams.get("image.cmap")
     kwargs["column"] = column_name
     kwargs["k"] = n_bins
