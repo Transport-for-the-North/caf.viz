@@ -10,6 +10,7 @@ from collections.abc import Mapping
 import folium
 import folium.template
 import geopandas as gpd
+import matplotlib as mpl
 import pandas as pd
 import tqdm
 import xyzservices
@@ -139,7 +140,9 @@ class ExploreOptions:
     style: dict = dataclasses.field(default_factory=dict)
     highlight_style: dict = dataclasses.field(default_factory=dict)
     legend_title: str | None = None
-    cmap: str | list[str] = "viridis"
+    cmap: str | list[str] = dataclasses.field(
+        default_factory=lambda: mpl.rcParams.get("image.cmap", "viridis")
+    )
     show: bool = True
     categorical: bool | None = None
     """Whether the legend should be categorical or not."""
@@ -357,6 +360,8 @@ class HeaderTileLayer(folium.TileLayer):
             self.headers[key] = value
 
 
+# TODO(MB): create a wrapper around this which generates the datasets from a single
+# GeoDataFrame by creating a separate layer for each column
 def map_datasets(
     datasets: Mapping[str, MapData],
     mask: geometry.Polygon

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Self
 
 import contextily
 import mapclassify
+import matplotlib as mpl
 import matplotlib.legend as mpllegend
 import numpy as np
 import pandas as pd
@@ -34,7 +35,6 @@ if TYPE_CHECKING:
 LOG = logging.getLogger(__name__)
 
 _HEATMAP_PLOT_DEFAULTS: dict[str, Any] = dict(
-    cmap="viridis_r",
     scheme="NaturalBreaks",
     legend_kwds=dict(title_fontsize="large", fontsize="medium", loc="upper right"),
     missing_kwds=dict(color="lightgrey", edgecolor="red", hatch="///", label="Missing values"),
@@ -345,6 +345,7 @@ def heatmap_figure(  # noqa: PLR0913 pylint: disable=too-many-arguments,too-many
         axes[0].legend(**_HEATMAP_PLOT_DEFAULTS["legend_kwds"])
 
     kwargs = _HEATMAP_PLOT_DEFAULTS.copy()
+    kwargs["cmap"] = mpl.rcParams.get("image.cmap")
     kwargs["column"] = column_name
     kwargs["k"] = n_bins
     if legend_kwds is not None:
