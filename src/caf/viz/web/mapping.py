@@ -360,8 +360,7 @@ class HeaderTileLayer(folium.TileLayer):
             self.headers[key] = value
 
 
-# TODO(MB): create a wrapper around this which generates the datasets from a single
-# GeoDataFrame by creating a separate layer for each column
+# TODO(MB): wrapper function to map all columns from GeoDataFrame #61
 def map_datasets(
     datasets: Mapping[str, MapData],
     mask: geometry.Polygon
