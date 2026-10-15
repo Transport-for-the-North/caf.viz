@@ -77,16 +77,16 @@ class Bounds:
     xmax: int | float
     ymax: int | float
 
-    def __add__(self, value: object) -> Self:
-        """Create a bounding box which contain both."""
-        if not isinstance(value, self.__class__):
-            raise TypeError(f"value should be {self.__class__} not {type(value)}")
+    def __add__(self, other: object) -> Self:
+        """Create a bounding box which contains both self and other."""
+        if not isinstance(other, self.__class__):
+            raise TypeError(f"value should be {self.__class__} not {type(other)}")
 
         return self.__class__(
-            xmin=min(self.xmin, value.xmin),
-            ymin=min(self.ymin, value.ymin),
-            xmax=max(self.xmax, value.xmax),
-            ymax=max(self.ymax, value.ymax),
+            xmin=min(self.xmin, other.xmin),
+            ymin=min(self.ymin, other.ymin),
+            xmax=max(self.xmax, other.xmax),
+            ymax=max(self.ymax, other.ymax),
         )
 
     def as_tuple(self) -> tuple[int | float, int | float, int | float, int | float]:
