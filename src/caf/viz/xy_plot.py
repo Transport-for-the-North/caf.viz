@@ -7,6 +7,7 @@ from __future__ import annotations
 # Built-Ins
 import enum
 import logging
+import re
 import warnings
 from typing import TYPE_CHECKING
 
@@ -19,7 +20,7 @@ from pydantic import dataclasses
 from scipy import stats
 
 # Local Imports
-from caf.viz import subplots, utils
+from caf.viz import subplots
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -67,6 +68,12 @@ class CmapData:
         return None
 
 
+def _normalise_name(name: str) -> str:
+    """Convert name to lowercase and replace spaces with underscore."""
+    name = name.lower().strip()
+    return re.sub(r"\s+", "_", name)
+
+
 class XYPlotType(enum.Enum):
     """Types of 2D XY plots."""
 
@@ -76,7 +83,7 @@ class XYPlotType(enum.Enum):
 
     @classmethod
     def _missing_(cls, value) -> XYPlotType | None:  # noqa: ANN001
-        normal = utils.normalise_name(str(value))
+        normal = _normalise_name(str(value))
         for member in cls:
             if member.value == normal:
                 return member

@@ -11,10 +11,11 @@ import math
 import re
 import time
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 import contextily
 import mapclassify
+import matplotlib as mpl
 import matplotlib.legend as mpllegend
 import numpy as np
 import pandas as pd
@@ -22,6 +23,8 @@ import requests
 from matplotlib import patches
 from matplotlib import pyplot as plt
 from shapely import geometry
+
+import caf.viz as cviz
 
 if TYPE_CHECKING:
     import geopandas as gpd
@@ -31,14 +34,18 @@ if TYPE_CHECKING:
 ##### CONSTANTS #####
 LOG = logging.getLogger(__name__)
 
-_HEATMAP_PLOT_DEFAULTS: dict[str, Any] = dict(
-    cmap="viridis_r",
-    scheme="NaturalBreaks",
-    legend_kwds=dict(title_fontsize="large", fontsize="medium", loc="upper right"),
-    missing_kwds=dict(color="lightgrey", edgecolor="red", hatch="///", label="Missing values"),
-    linewidth=0.0,
-    edgecolor="black",
-)
+
+def _heatmap_plot_defaults() -> dict[str, Any]:
+    """Factory to create default heatmap kwargs."""  # noqa: D401
+    return dict(
+        scheme="NaturalBreaks",
+        legend_kwds=dict(title_fontsize="large", fontsize="medium", loc="upper right"),
+        missing_kwds=dict(
+            color="lightgrey", edgecolor="red", hatch="///", label="Missing values"
+        ),
+        linewidth=0.0,
+        edgecolor="black",
+    )
 
 
 ##### CLASSES #####
@@ -62,15 +69,27 @@ class CustomCmap:
 
 
 @dataclasses.dataclass
-class Extent:
-    """Bounding box / extent for a map."""
+class Bounds:
+    """Bounding box coordinates."""
 
-    xmin: float
-    ymin: float
-    xmax: float
-    ymax: float
+    xmin: int | float
+    ymin: int | float
+    xmax: int | float
+    ymax: int | float
 
-    def as_tuple(self) -> tuple[float, float, float, float]:
+    def __add__(self, other: object) -> Self:
+        """Create a bounding box which contains both self and other."""
+        if not isinstance(other, self.__class__):
+            raise TypeError(f"value should be {self.__class__} not {type(other)}")
+
+        return self.__class__(
+            xmin=min(self.xmin, other.xmin),
+            ymin=min(self.ymin, other.ymin),
+            xmax=max(self.xmax, other.xmax),
+            ymax=max(self.ymax, other.ymax),
+        )
+
+    def as_tuple(self) -> tuple[int | float, int | float, int | float, int | float]:
         """Convert to tuple in format (xmin, ymin, xmax, ymax)."""
         return (self.xmin, self.ymin, self.xmax, self.ymax)
 
@@ -272,7 +291,7 @@ def heatmap_figure(  # noqa: PLR0913 pylint: disable=too-many-arguments,too-many
     polygon_boundary: geometry.Polygon | geometry.MultiPolygon = None,
     positive_negative_colormaps: bool = False,
     legend_label_fmt: str = "{:.0f}",
-    zoomed_bounds: Extent | None = None,
+    zoomed_bounds: Bounds | None = None,
     legend_kwds: dict[str, Any] | None = None,
     missing_kwds: dict[str, Any] | None = None,
     annotation: str | None = None,
@@ -317,22 +336,22 @@ def heatmap_figure(  # noqa: PLR0913 pylint: disable=too-many-arguments,too-many
     """
     ncols = 1 if zoomed_bounds is None else 2
 
-    fig, axes = plt.subplots(
-        1, ncols, figsize=(20, 15), frameon=False, constrained_layout=True
-    )
+    fig, axes = plt.subplots(1, ncols, frameon=False, constrained_layout=True)
     if ncols == 1:
         axes: list[plt.Axes] = [axes]  # type: ignore[no-redef]
 
-    fig.suptitle(title, fontsize="xx-large", backgroundcolor="white")
+    kwargs = _heatmap_plot_defaults()
+
+    fig.suptitle(title)
     for ax in axes:
         ax.set_aspect("equal")
         ax.set_axis_off()
         if polygon_boundary is not None:
             _add_poly_boundary(ax, polygon_boundary)
     if polygon_boundary is not None:
-        axes[0].legend(**_HEATMAP_PLOT_DEFAULTS["legend_kwds"])
+        axes[0].legend(**kwargs["legend_kwds"])
 
-    kwargs = _HEATMAP_PLOT_DEFAULTS.copy()
+    kwargs["cmap"] = mpl.rcParams.get("image.cmap")
     kwargs["column"] = column_name
     kwargs["k"] = n_bins
     if legend_kwds is not None:
@@ -387,7 +406,7 @@ def _annotate(annotation: str | None, ax: plt.Axes) -> None:
     )
 
 
-def _set_limits(ax: plt.Axes, bounds: Extent | None) -> None:
+def _set_limits(ax: plt.Axes, bounds: Bounds | None) -> None:
     if bounds is None:
         return
     ax.set_xlim(bounds.xmin, bounds.xmax)
@@ -402,7 +421,7 @@ def _plot_heatmap(
     legend_label_fmt: str,
     kwargs: dict[str, Any],
     bins: list[int | float] | None,
-    zoomed_bounds: Extent | None,
+    zoomed_bounds: Bounds | None,
 ) -> None:
     if bins is not None:
         kwargs["scheme"] = "UserDefined"
@@ -414,16 +433,16 @@ def _plot_heatmap(
         del kwargs["k"]
 
     # If the quatiles scheme throws a warning then use FisherJenksSampled
-    with warnings.catch_warnings(action="error", category=UserWarning):
-        try:
+    try:
+        with warnings.catch_warnings(action="error", category=UserWarning):
             geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
             if zoomed_bounds is not None:
                 geodata.plot(ax=axes[1], legend=True, **kwargs)
-        except UserWarning:
-            kwargs["scheme"] = "FisherJenksSampled"
-            geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
-            if zoomed_bounds is not None:
-                geodata.plot(ax=axes[1], legend=True, **kwargs)
+    except UserWarning:
+        kwargs["scheme"] = "FisherJenksSampled"
+        geodata.plot(ax=axes[0], legend=zoomed_bounds is None, **kwargs)
+        if zoomed_bounds is not None:
+            geodata.plot(ax=axes[1], legend=True, **kwargs)
 
     _format_legend_labels(axes[-1].get_legend(), legend_label_fmt)
 
@@ -483,6 +502,17 @@ def _positive_negative_cmap(
     return cmap
 
 
+def _osm_headers(source: xyzservices.TileProvider) -> dict[str, str] | None:
+    if source.name == "OpenStreetMap.Mapnik":
+        header = {
+            "User-Agent": f"{cviz.__package__}/{cviz.__version__}"
+            " (https://github.com/Transport-for-the-North/caf.viz)"
+        }
+        LOG.debug("Adding headers %s for %s tiles", header, source.name)
+        return header
+    return None
+
+
 def _get_basemap(
     ax: plt.Axes,
     source: xyzservices.TileProvider,
@@ -519,7 +549,9 @@ def _get_basemap(
     count = 0
     while True:
         try:
-            return contextily.bounds2img(xmin, ymin, xmax, ymax, source=source)
+            return contextily.bounds2img(
+                xmin, ymin, xmax, ymax, source=source, headers=_osm_headers(source)
+            )
         except requests.exceptions.ConnectionError as exc:
             if count >= max_retries:
                 exc.add_note(f"max retries ({max_retries}) reached")
@@ -642,6 +674,18 @@ class LayerOptions:
             self.edgecolor = self.color
             self.facecolor = self.color
 
+    def to_style(self) -> dict[str, str | float]:
+        """Output to style dictionary for :class:`~caf.viz.web.ExploreOptions`."""
+        style: dict[str, str | float] = {}
+        if self.edgecolor is not None:
+            style["color"] = "" if self.edgecolor == "none" else self.edgecolor
+        if self.facecolor is not None:
+            style["fillColor"] = "" if self.facecolor == "none" else self.facecolor
+        if self.size is not None:
+            style["weight"] = self.size
+            style["markersize"] = self.size
+        return style
+
 
 @dataclasses.dataclass
 class LayerData:
@@ -654,7 +698,7 @@ class LayerData:
 def simple_map(
     layers: dict[str, LayerData],
     legend_title: str,
-    extent: Extent | None = None,
+    extent: Bounds | None = None,
 ) -> plt.Figure:
     """Plot GeoSpatial data on a map with a grayscale background.
 
@@ -672,21 +716,21 @@ def simple_map(
     plt.Figure
         Figure containing a single axes with plotted data.
     """
-    fig, ax = plt.subplots(1, figsize=(15, 10), layout="compressed", frameon=False)
+    fig, ax = plt.subplots(1, layout="compressed", frameon=False)
     ax.set_axis_off()
 
     for name, layer in layers.items():
         data = layer.data.to_crs(epsg=3857)
         if extent is not None:
-            data = data.clip_by_rect(extent.as_tuple())
+            data = data.clip_by_rect(*extent.as_tuple())
         data.plot(
             ax=ax,
             label=name,
             edgecolor=layer.ops.edgecolor,
             facecolor=layer.ops.facecolor,
             zorder=layer.ops.zorder,
-            markersize=None if layer.ops.size is None else layer.ops.size,
-            linewidth=None if layer.ops.size is None else layer.ops.size,
+            markersize=layer.ops.size,
+            linewidth=layer.ops.size,
         )
 
     ax.legend(title=legend_title)
